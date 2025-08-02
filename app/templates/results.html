@@ -113,7 +113,7 @@
                 </div>
 
                 <div class="d-grid gap-2">
-                    <a href="/" class="btn btn-outline-primary">Analyze Another Stock</a>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-primary">Analyze Another Stock</a>
                     {% if symbol %}
                     <a href="https://finance.yahoo.com/quote/{{ symbol }}" target="_blank" class="btn btn-outline-secondary">
                         View on Yahoo Finance
