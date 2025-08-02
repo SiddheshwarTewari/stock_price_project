@@ -23,3 +23,8 @@ footer {
 .badge {
     font-size: 0.9rem;
 }
+
+.spinner-border {
+    vertical-align: middle;
+    margin-left: 5px;
+}

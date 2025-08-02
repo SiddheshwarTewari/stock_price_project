@@ -10,7 +10,7 @@
                 <h4 class="mb-0">Stock Analysis Tool</h4>
             </div>
             <div class="card-body">
-                <form method="GET" action="{{ url_for('main.index') }}">
+                <form method="GET" action="{{ url_for('main.index') }}" id="stockForm">
                     {{ form.hidden_tag() }}
                     
                     <div class="mb-3">
@@ -19,8 +19,13 @@
                             class="form-control", 
                             placeholder="e.g. AAPL, MSFT, GOOGL", 
                             required=True,
-                            value=request.args.get('symbol', '')
+                            value=request.args.get('symbol', ''),
+                            pattern="[A-Za-z]{1,5}",
+                            title="Stock symbol must be 1-5 letters"
                         ) }}
+                        <div class="invalid-feedback">
+                            Please enter a valid stock symbol (1-5 letters)
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -28,11 +33,28 @@
                         {{ form.time_frame(class="form-select") }}
                     </div>
                     
-                    <button type="submit" class="btn btn-primary">Analyze</button>
+                    <button type="submit" class="btn btn-primary" id="analyzeBtn">
+                        <span id="submitText">Analyze</span>
+                        <span id="spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                    </button>
                 </form>
                 
                 {% if error %}
-                    <div class="alert alert-danger mt-3">{{ error }}</div>
+                <div class="alert alert-danger mt-3">
+                    <h5 class="alert-heading">Error Loading Data</h5>
+                    <p>{{ error }}</p>
+                    {% if symbol %}
+                    <hr>
+                    <p class="mb-0">
+                        <strong>Troubleshooting:</strong>
+                        <ul>
+                            <li>Check if <strong>{{ symbol }}</strong> is a valid stock symbol</li>
+                            <li>Try a different time frame</li>
+                            <li>Wait a minute if you've made several requests</li>
+                        </ul>
+                    </p>
+                    {% endif %}
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -40,18 +62,53 @@
         <div class="mt-4">
             <h5>Popular Stocks</h5>
             <div class="d-flex flex-wrap gap-2">
-                <a href="{{ url_for('main.index', symbol='AAPL', time_frame=time_frame) }}" 
-                class="btn btn-outline-secondary">Apple (AAPL)</a>
-                <a href="{{ url_for('main.index', symbol='MSFT', time_frame=time_frame) }}" 
-                class="btn btn-outline-secondary">Microsoft (MSFT)</a>
-                <a href="{{ url_for('main.index', symbol='GOOGL', time_frame=time_frame) }}" 
-                class="btn btn-outline-secondary">Google (GOOGL)</a>
-                <a href="{{ url_for('main.index', symbol='AMZN', time_frame=time_frame) }}" 
-                class="btn btn-outline-secondary">Amazon (AMZN)</a>
-                <a href="{{ url_for('main.index', symbol='TSLA', time_frame=time_frame) }}" 
-                class="btn btn-outline-secondary">Tesla (TSLA)</a>
+                {% for popular_symbol in ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'] %}
+                <a href="{{ url_for('main.index', symbol=popular_symbol, time_frame=time_frame) }}" 
+                   class="btn btn-outline-secondary">
+                    {{ popular_symbol }}
+                </a>
+                {% endfor %}
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('stockForm');
+    const symbolInput = document.getElementById('symbol');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const submitText = document.getElementById('submitText');
+    const spinner = document.getElementById('spinner');
+    
+    // Client-side validation
+    form.addEventListener('submit', function(e) {
+        const symbol = symbolInput.value.trim();
+        
+        if (!symbol || !/^[A-Za-z]{1,5}$/.test(symbol)) {
+            e.preventDefault();
+            symbolInput.classList.add('is-invalid');
+            return;
+        }
+        
+        // Show loading state
+        submitText.textContent = 'Analyzing...';
+        spinner.classList.remove('d-none');
+        analyzeBtn.disabled = true;
+    });
+    
+    // Clear validation on input
+    symbolInput.addEventListener('input', function() {
+        this.classList.remove('is-invalid');
+    });
+    
+    // Set selected time frame from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('time_frame')) {
+        document.getElementById('time_frame').value = urlParams.get('time_frame');
+    }
+});
+</script>
 {% endblock %}
