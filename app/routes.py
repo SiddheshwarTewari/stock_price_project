@@ -27,13 +27,13 @@ def index():
     symbol = request.args.get('symbol', 'AAPL').upper()
     time_frame = request.args.get('time_frame', 'daily')
 
+    # Handle form submission
     if form.validate_on_submit():
-        # Redirect to the same page with the new symbol and time frame as query parameters
-        return redirect(url_for('main.index', 
-                             symbol=form.symbol.data.upper(), 
-                             time_frame=form.time_frame.data))
+        symbol = form.symbol.data.upper()
+        time_frame = form.time_frame.data
+        return redirect(url_for('main.index', symbol=symbol, time_frame=time_frame))
     
-    # Rest of your existing code...
+    # Fetch and process data
     data = fetch_stock_data(symbol, time_frame)
     
     if 'Error Message' in data:
@@ -43,25 +43,23 @@ def index():
                             symbol=symbol,
                             time_frame=time_frame)
     
+    # Rest of your processing code...
     stats = calculate_stats(data, time_frame)
     recent_prices = get_recent_prices(data, time_frame)
     price_change, price_change_pct = calculate_price_change(data, time_frame)
-    
-    # Prepare chart data
     chart_data = prepare_chart_data(data, time_frame)
     
     return render_template('results.html',
-                                form=form,
-                                symbol=symbol,
-                                time_frame=time_frame,
-                                stats=stats,
-                                recent_prices=recent_prices,
-                                current_price=stats['current'],
-                                price_change=price_change,
-                                price_change_pct=price_change_pct,
-                                chart_labels=json.dumps(list(chart_data['labels'])),
-                                chart_prices=json.dumps(list(chart_data['prices']))
-                            )
+                        form=form,
+                        symbol=symbol,
+                        time_frame=time_frame,
+                        stats=stats,
+                        recent_prices=recent_prices,
+                        current_price=stats['current'],
+                        price_change=price_change,
+                        price_change_pct=price_change_pct,
+                        chart_labels=json.dumps(list(chart_data['labels'])),
+                        chart_prices=json.dumps(list(chart_data['prices'])))
 
 def prepare_chart_data(data, time_frame):
     """Prepare data specifically for the chart"""

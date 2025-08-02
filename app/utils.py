@@ -41,7 +41,8 @@ def fetch_stock_data(symbol, time_frame='daily'):
         )
         
         if not time_series_key:
-            return {'Error Message': 'No time series data found in response'}
+            current_app.logger.error(f"No time series found in response for {symbol}")
+            return {'Error Message': f'No data available for {symbol}'}
             
         return data
         
