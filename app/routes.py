@@ -140,22 +140,54 @@ def get_recent_prices(data, time_frame, count=10):
     time_series = data.get(time_series_key, {})
     return dict(list(time_series.items())[:count])
 
-def calculate_price_change(data, time_frame):
-    time_series_key = {
-        'daily': 'Time Series (Daily)',
-        'weekly': 'Weekly Time Series',
-        'monthly': 'Monthly Time Series'
-    }.get(time_frame, 'Time Series (Daily)')
+def calculate_stats(data, time_frame):
+    # Find the correct time series key
+    time_series_key = next(
+        (key for key in data.keys() if "Time Series" in key),
+        None
+    )
+    
+    if not time_series_key:
+        return {
+            'days': 0,
+            'minimum': 0,
+            'maximum': 0,
+            'average': 0,
+            'current': 0
+        }
     
     time_series = data.get(time_series_key, {})
-    if len(time_series) < 2:
-        return 0, 0
     
-    dates = sorted(time_series.keys(), reverse=True)
-    current = float(time_series[dates[0]]['4. close'])
-    previous = float(time_series[dates[1]]['4. close'])
+    # Convert to list of (date, values) and sort chronologically
+    sorted_series = sorted(
+        time_series.items(),
+        key=lambda x: x[0]  # Sort by date
+    )
     
-    change = current - previous
-    change_pct = (change / previous) * 100
+    closing_prices = []
+    for date, values in sorted_series:
+        try:
+            closing_price = float(values['4. close'])
+            closing_prices.append(closing_price)
+        except (KeyError, ValueError, TypeError):
+            continue
     
-    return change, change_pct
+    if not closing_prices:
+        return {
+            'days': 0,
+            'minimum': 0,
+            'maximum': 0,
+            'average': 0,
+            'current': 0
+        }
+    
+    latest_date, latest_values = sorted_series[-1]
+    current_price = float(latest_values['4. close'])
+    
+    return {
+        'days': len(closing_prices),
+        'minimum': min(closing_prices),
+        'maximum': max(closing_prices),
+        'average': sum(closing_prices) / len(closing_prices),
+        'current': current_price
+    }
