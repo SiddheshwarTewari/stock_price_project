@@ -27,19 +27,20 @@ def index():
     symbol = request.args.get('symbol', 'AAPL').upper()
     time_frame = request.args.get('time_frame', 'daily')
 
-    # Handle form submission
     if form.validate_on_submit():
         symbol = form.symbol.data.upper()
         time_frame = form.time_frame.data
         return redirect(url_for('main.index', symbol=symbol, time_frame=time_frame))
     
-    # Fetch and process data
     data = fetch_stock_data(symbol, time_frame)
     
     if 'Error Message' in data:
+        error_msg = data['Error Message']
+        if 'Debug' in data:
+            current_app.logger.debug(f"Debug info: {data['Debug']}")
         return render_template('index.html', 
                             form=form,
-                            error=data['Error Message'],
+                            error=error_msg,
                             symbol=symbol,
                             time_frame=time_frame)
     
