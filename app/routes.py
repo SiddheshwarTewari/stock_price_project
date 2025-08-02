@@ -2,95 +2,9 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from datetime import datetime, timedelta
 import requests
 from functools import wraps
+import json
 from .forms import StockForm
-
-# Add these helper functions at the top of routes.py, right after the imports
-def fetch_stock_data(symbol, time_frame='daily'):
-    api_key = current_app.config['ALPHA_VANTAGE_API_KEY']
-    
-    function_map = {
-        'daily': 'TIME_SERIES_DAILY',
-        'weekly': 'TIME_SERIES_WEEKLY',
-        'monthly': 'TIME_SERIES_MONTHLY'
-    }
-    
-    url = (
-        f'https://www.alphavantage.co/query?'
-        f'function={function_map.get(time_frame, "TIME_SERIES_DAILY")}'
-        f'&symbol={symbol}'
-        f'&apikey={api_key}'
-        f'&outputsize=compact'
-    )
-    
-    response = requests.get(url)
-    response.raise_for_status()
-    return response.json()
-
-def calculate_stats(data, time_frame):
-    time_series_key = {
-        'daily': 'Time Series (Daily)',
-        'weekly': 'Weekly Time Series',
-        'monthly': 'Monthly Time Series'
-    }.get(time_frame, 'Time Series (Daily)')
-    
-    time_series = data.get(time_series_key, {})
-    closing_prices = []
-    
-    for date, values in time_series.items():
-        try:
-            closing_prices.append(float(values['4. close']))
-        except (KeyError, ValueError):
-            continue
-    
-    if not closing_prices:
-        return {
-            'days': 0,
-            'minimum': 0,
-            'maximum': 0,
-            'average': 0,
-            'current': 0
-        }
-    
-    latest_date = next(iter(time_series))
-    current_price = float(time_series[latest_date]['4. close'])
-    
-    return {
-        'days': len(closing_prices),
-        'minimum': min(closing_prices),
-        'maximum': max(closing_prices),
-        'average': sum(closing_prices) / len(closing_prices),
-        'current': current_price
-    }
-
-def get_recent_prices(data, time_frame, count=10):
-    time_series_key = {
-        'daily': 'Time Series (Daily)',
-        'weekly': 'Weekly Time Series',
-        'monthly': 'Monthly Time Series'
-    }.get(time_frame, 'Time Series (Daily)')
-    
-    time_series = data.get(time_series_key, {})
-    return dict(list(time_series.items())[:count])
-
-def calculate_price_change(data, time_frame):
-    time_series_key = {
-        'daily': 'Time Series (Daily)',
-        'weekly': 'Weekly Time Series',
-        'monthly': 'Monthly Time Series'
-    }.get(time_frame, 'Time Series (Daily)')
-    
-    time_series = data.get(time_series_key, {})
-    if len(time_series) < 2:
-        return 0, 0
-    
-    dates = sorted(time_series.keys(), reverse=True)
-    current = float(time_series[dates[0]]['4. close'])
-    previous = float(time_series[dates[1]]['4. close'])
-    
-    change = current - previous
-    change_pct = (change / previous) * 100
-    
-    return change, change_pct
+from .utils import fetch_stock_data
 
 bp = Blueprint('main', __name__)
 
@@ -130,73 +44,52 @@ def index():
     recent_prices = get_recent_prices(data, time_frame)
     price_change, price_change_pct = calculate_price_change(data, time_frame)
     
+    # Prepare chart data
+    chart_data = prepare_chart_data(data, time_frame)
+    
     return render_template('results.html',
-                         form=form,
-                         symbol=symbol,
-                         time_frame=time_frame,
-                         stats=stats,
-                         recent_prices=recent_prices,
-                         current_price=stats['current'],
-                         price_change=price_change,
-                         price_change_pct=price_change_pct)
+                                form=form,
+                                symbol=symbol,
+                                time_frame=time_frame,
+                                stats=stats,
+                                recent_prices=recent_prices,
+                                current_price=stats['current'],
+                                price_change=price_change,
+                                price_change_pct=price_change_pct,
+                                chart_labels=json.dumps(list(chart_data['labels'])),
+                                chart_prices=json.dumps(list(chart_data['prices']))
+                            )
 
-@bp.route('/api/stock/<symbol>')
-@handle_api_errors
-def api_stock(symbol):
-    time_frame = request.args.get('time_frame', 'daily')
-    data = fetch_stock_data(symbol, time_frame)
+def prepare_chart_data(data, time_frame):
+    """Prepare data specifically for the chart"""
+    time_series_key = next((k for k in data.keys() if "Time Series" in k), None)
+    if not time_series_key:
+        return {'labels': [], 'prices': []}
     
-    # Transform data for frontend
-    time_series_key = {
-        'daily': 'Time Series (Daily)',
-        'weekly': 'Weekly Time Series',
-        'monthly': 'Monthly Time Series'
-    }.get(time_frame, 'Time Series (Daily)')
+    series = data[time_series_key]
+    sorted_data = sorted(series.items(), key=lambda x: x[0])  # Sort by date
     
-    transformed = {
-        'symbol': symbol,
-        'time_frame': time_frame,
-        'series': data.get(time_series_key, {})
+    # Limit to 100 data points for better performance
+    limited_data = sorted_data[-100:] if len(sorted_data) > 100 else sorted_data
+    
+    return {
+        'labels': [item[0] for item in limited_data],
+        'prices': [float(item[1]['4. close']) for item in limited_data]
     }
-    return jsonify(transformed)
-
-# Helper functions
-def fetch_stock_data(symbol, time_frame='daily'):
-    api_key = current_app.config['ALPHA_VANTAGE_API_KEY']
-    
-    function_map = {
-        'daily': 'TIME_SERIES_DAILY',
-        'weekly': 'TIME_SERIES_WEEKLY',
-        'monthly': 'TIME_SERIES_MONTHLY'
-    }
-    
-    url = (
-        f'https://www.alphavantage.co/query?'
-        f'function={function_map.get(time_frame, "TIME_SERIES_DAILY")}'
-        f'&symbol={symbol}'
-        f'&apikey={api_key}'
-        f'&outputsize=compact'
-    )
-    
-    response = requests.get(url)
-    response.raise_for_status()
-    return response.json()
 
 def calculate_stats(data, time_frame):
-    time_series_key = {
-        'daily': 'Time Series (Daily)',
-        'weekly': 'Weekly Time Series',
-        'monthly': 'Monthly Time Series'
-    }.get(time_frame, 'Time Series (Daily)')
+    time_series_key = next((k for k in data.keys() if "Time Series" in k), None)
+    if not time_series_key:
+        return {
+            'days': 0,
+            'minimum': 0,
+            'maximum': 0,
+            'average': 0,
+            'current': 0
+        }
     
-    time_series = data.get(time_series_key, {})
-    closing_prices = []
-    
-    for date, values in time_series.items():
-        try:
-            closing_prices.append(float(values['4. close']))
-        except (KeyError, ValueError):
-            continue
+    series = data[time_series_key]
+    closing_prices = [float(v['4. close']) for v in series.values()]
     
     if not closing_prices:
         return {
@@ -207,8 +100,8 @@ def calculate_stats(data, time_frame):
             'current': 0
         }
     
-    latest_date = next(iter(time_series))
-    current_price = float(time_series[latest_date]['4. close'])
+    latest_date = max(series.keys())
+    current_price = float(series[latest_date]['4. close'])
     
     return {
         'days': len(closing_prices),
@@ -219,63 +112,51 @@ def calculate_stats(data, time_frame):
     }
 
 def get_recent_prices(data, time_frame, count=10):
-    time_series_key = {
-        'daily': 'Time Series (Daily)',
-        'weekly': 'Weekly Time Series',
-        'monthly': 'Monthly Time Series'
-    }.get(time_frame, 'Time Series (Daily)')
-    
-    time_series = data.get(time_series_key, {})
-    return dict(list(time_series.items())[:count])
-
-def calculate_stats(data, time_frame):
-    # Find the correct time series key
-    time_series_key = next(
-        (key for key in data.keys() if "Time Series" in key),
-        None
-    )
-    
+    time_series_key = next((k for k in data.keys() if "Time Series" in k), None)
     if not time_series_key:
-        return {
-            'days': 0,
-            'minimum': 0,
-            'maximum': 0,
-            'average': 0,
-            'current': 0
-        }
+        return {}
     
-    time_series = data.get(time_series_key, {})
+    series = data[time_series_key]
+    # Get most recent dates
+    sorted_dates = sorted(series.keys(), reverse=True)
+    return {date: series[date] for date in sorted_dates[:count]}
+
+def calculate_price_change(data, time_frame):
+    time_series_key = next((k for k in data.keys() if "Time Series" in k), None)
+    if not time_series_key or len(data[time_series_key]) < 2:
+        return 0, 0
     
-    # Convert to list of (date, values) and sort chronologically
-    sorted_series = sorted(
-        time_series.items(),
-        key=lambda x: x[0]  # Sort by date
-    )
+    series = data[time_series_key]
+    dates = sorted(series.keys(), reverse=True)
+    current = float(series[dates[0]]['4. close'])
+    previous = float(series[dates[1]]['4. close'])
     
-    closing_prices = []
-    for date, values in sorted_series:
-        try:
-            closing_price = float(values['4. close'])
-            closing_prices.append(closing_price)
-        except (KeyError, ValueError, TypeError):
-            continue
+    change = current - previous
+    change_pct = (change / previous) * 100
     
-    if not closing_prices:
-        return {
-            'days': 0,
-            'minimum': 0,
-            'maximum': 0,
-            'average': 0,
-            'current': 0
-        }
+    return change, change_pct
+
+@bp.route('/api/stock/<symbol>')
+@handle_api_errors
+def api_stock(symbol):
+    time_frame = request.args.get('time_frame', 'daily')
+    data = fetch_stock_data(symbol, time_frame)
     
-    latest_date, latest_values = sorted_series[-1]
-    current_price = float(latest_values['4. close'])
+    if 'Error Message' in data:
+        return jsonify({'error': data['Error Message']}), 400
     
-    return {
-        'days': len(closing_prices),
-        'minimum': min(closing_prices),
-        'maximum': max(closing_prices),
-        'average': sum(closing_prices) / len(closing_prices),
-        'current': current_price
-    }
+    time_series_key = next((k for k in data.keys() if "Time Series" in k), None)
+    if not time_series_key:
+        return jsonify({'error': 'No time series data found'}), 404
+    
+    # Transform data for frontend
+    series = data[time_series_key]
+    sorted_data = sorted(series.items(), key=lambda x: x[0])
+    limited_data = sorted_data[-100:] if len(sorted_data) > 100 else sorted_data
+    
+    return jsonify({
+        'symbol': symbol,
+        'time_frame': time_frame,
+        'labels': [item[0] for item in limited_data],
+        'prices': [float(item[1]['4. close']) for item in limited_data]
+    })

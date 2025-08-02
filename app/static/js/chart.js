@@ -1,4 +1,12 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // First try to use data passed directly from template
+    if (typeof chartData !== 'undefined' && chartData.labels && chartData.prices) {
+        renderChart('priceChart', chartData.labels, chartData.prices, 
+                  chartData.symbol || 'Stock', chartData.timeFrame || 'daily');
+        return;
+    }
+
+    // Fallback to API call if direct data not available
     const chartContainer = document.getElementById('chartContainer');
     if (!chartContainer) return;
     
@@ -15,21 +23,11 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(data => {
             if (data.error) throw new Error(data.error);
-            
-            // Find the time series data
-            const timeSeriesKey = Object.keys(data).find(key => key.includes('Time Series'));
-            if (!timeSeriesKey) throw new Error('No time series data found');
-            
-            const timeSeries = data[timeSeriesKey];
-            const sortedData = Object.entries(timeSeries)
-                .sort((a, b) => new Date(a[0]) - new Date(b[0]));
-            
-            const labels = sortedData.map(item => item[0]);
-            const prices = sortedData.map(item => parseFloat(item[1]['4. close']));
+            if (!data.labels || !data.prices) throw new Error('Invalid data format');
             
             // Render chart
             chartContainer.innerHTML = '<canvas id="priceChart"></canvas>';
-            renderChart('priceChart', labels, prices, symbol, timeFrame);
+            renderChart('priceChart', data.labels, data.prices, symbol, timeFrame);
         })
         .catch(error => {
             console.error('Error:', error);
@@ -43,30 +41,40 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function renderChart(elementId, labels, prices, symbol, timeFrame) {
-    new Chart(document.getElementById(elementId), {
+    const ctx = document.getElementById(elementId).getContext('2d');
+    
+    // Determine chart color based on trend
+    const firstPrice = prices[0];
+    const lastPrice = prices[prices.length - 1];
+    const chartColor = lastPrice >= firstPrice ? 'rgba(40, 167, 69, 1)' : 'rgba(220, 53, 69, 1)';
+    const bgColor = lastPrice >= firstPrice ? 'rgba(40, 167, 69, 0.2)' : 'rgba(220, 53, 69, 0.2)';
+    
+    new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
                 label: `${symbol} Closing Price (${timeFrame})`,
                 data: prices,
-                borderColor: 'rgba(75, 192, 192, 1)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: chartColor,
+                backgroundColor: bgColor,
+                borderWidth: 2,
                 tension: 0.1,
-                fill: true
+                fill: true,
+                pointRadius: 0
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                title: {
+                legend: {
                     display: true,
-                    text: `${symbol} ${timeFrame} Price Chart`,
-                    font: {
-                        size: 16
-                    }
+                    position: 'top',
                 },
                 tooltip: {
+                    mode: 'index',
+                    intersect: false,
                     callbacks: {
                         label: function(context) {
                             return `$${context.parsed.y.toFixed(2)}`;
@@ -80,14 +88,25 @@ function renderChart(elementId, labels, prices, symbol, timeFrame) {
                         callback: function(value) {
                             return `$${value}`;
                         }
+                    },
+                    grid: {
+                        drawBorder: false
                     }
                 },
                 x: {
+                    grid: {
+                        display: false
+                    },
                     ticks: {
                         maxRotation: 45,
                         minRotation: 45
                     }
                 }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
             }
         }
     });

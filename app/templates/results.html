@@ -152,6 +152,15 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    // Pass chart data directly to JavaScript
+    const chartData = {
+        labels: JSON.parse('{{ chart_labels|safe }}'),
+        prices: JSON.parse('{{ chart_prices|safe }}'),
+        symbol: "{{ symbol }}",
+        timeFrame: "{{ time_frame }}"
+    };
+</script>
 <script src="{{ url_for('static', filename='js/chart.js') }}"></script>
 <script>
     // Additional interactive elements
@@ -167,10 +176,6 @@
             row.addEventListener('click', function() {
                 const date = this.cells[0].textContent.trim();
                 alert(`Show detailed analysis for ${date}`);
-                // In a real implementation, you might:
-                // 1. Fetch intraday data for this date
-                // 2. Show a modal with detailed candle chart
-                // 3. Display news from that day
             });
         });
     });
