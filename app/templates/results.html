@@ -9,16 +9,16 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h4 class="mb-0">{{ symbol }} - Price Analysis</h4>
                 <div class="time-frame-buttons">
-                    <a href="?symbol={{ symbol }}&time_frame=daily" 
-                       class="btn btn-sm {% if time_frame == 'daily' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    <a href="{{ url_for('main.index', symbol=symbol, time_frame='daily') }}" 
+                    class="btn btn-sm {% if time_frame == 'daily' %}btn-primary{% else %}btn-outline-primary{% endif %}">
                         Daily
                     </a>
-                    <a href="?symbol={{ symbol }}&time_frame=weekly" 
-                       class="btn btn-sm {% if time_frame == 'weekly' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    <a href="{{ url_for('main.index', symbol=symbol, time_frame='weekly') }}" 
+                    class="btn btn-sm {% if time_frame == 'weekly' %}btn-primary{% else %}btn-outline-primary{% endif %}">
                         Weekly
                     </a>
-                    <a href="?symbol={{ symbol }}&time_frame=monthly" 
-                       class="btn btn-sm {% if time_frame == 'monthly' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    <a href="{{ url_for('main.index', symbol=symbol, time_frame='monthly') }}" 
+                    class="btn btn-sm {% if time_frame == 'monthly' %}btn-primary{% else %}btn-outline-primary{% endif %}">
                         Monthly
                     </a>
                 </div>
@@ -112,7 +112,9 @@
                 </div>
 
                 <div class="d-grid gap-2">
-                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-primary">Analyze Another Stock</a>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left"></i> Analyze Another Stock
+                    </a>
                     {% if symbol %}
                     <a href="https://finance.yahoo.com/quote/{{ symbol }}" target="_blank" class="btn btn-outline-secondary">
                         View on Yahoo Finance

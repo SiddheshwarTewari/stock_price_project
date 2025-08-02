@@ -10,12 +10,17 @@
                 <h4 class="mb-0">Stock Analysis Tool</h4>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('main.index') }}">
+                <form method="GET" action="{{ url_for('main.index') }}">
                     {{ form.hidden_tag() }}
                     
                     <div class="mb-3">
                         {{ form.symbol.label(class="form-label") }}
-                        {{ form.symbol(class="form-control", placeholder="e.g. AAPL, MSFT, GOOGL", required=True) }}
+                        {{ form.symbol(
+                            class="form-control", 
+                            placeholder="e.g. AAPL, MSFT, GOOGL", 
+                            required=True,
+                            value=request.args.get('symbol', '')
+                        ) }}
                     </div>
                     
                     <div class="mb-3">
@@ -35,11 +40,16 @@
         <div class="mt-4">
             <h5>Popular Stocks</h5>
             <div class="d-flex flex-wrap gap-2">
-                <a href="/?symbol=AAPL" class="btn btn-outline-secondary">Apple (AAPL)</a>
-                <a href="/?symbol=MSFT" class="btn btn-outline-secondary">Microsoft (MSFT)</a>
-                <a href="/?symbol=GOOGL" class="btn btn-outline-secondary">Google (GOOGL)</a>
-                <a href="/?symbol=AMZN" class="btn btn-outline-secondary">Amazon (AMZN)</a>
-                <a href="/?symbol=TSLA" class="btn btn-outline-secondary">Tesla (TSLA)</a>
+                <a href="{{ url_for('main.index', symbol='AAPL', time_frame=time_frame) }}" 
+                class="btn btn-outline-secondary">Apple (AAPL)</a>
+                <a href="{{ url_for('main.index', symbol='MSFT', time_frame=time_frame) }}" 
+                class="btn btn-outline-secondary">Microsoft (MSFT)</a>
+                <a href="{{ url_for('main.index', symbol='GOOGL', time_frame=time_frame) }}" 
+                class="btn btn-outline-secondary">Google (GOOGL)</a>
+                <a href="{{ url_for('main.index', symbol='AMZN', time_frame=time_frame) }}" 
+                class="btn btn-outline-secondary">Amazon (AMZN)</a>
+                <a href="{{ url_for('main.index', symbol='TSLA', time_frame=time_frame) }}" 
+                class="btn btn-outline-secondary">Tesla (TSLA)</a>
             </div>
         </div>
     </div>

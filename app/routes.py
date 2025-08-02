@@ -28,9 +28,12 @@ def index():
     time_frame = request.args.get('time_frame', 'daily')
 
     if form.validate_on_submit():
-        symbol = form.symbol.data.upper()
-        time_frame = form.time_frame.data
+        # Redirect to the same page with the new symbol and time frame as query parameters
+        return redirect(url_for('main.index', 
+                             symbol=form.symbol.data.upper(), 
+                             time_frame=form.time_frame.data))
     
+    # Rest of your existing code...
     data = fetch_stock_data(symbol, time_frame)
     
     if 'Error Message' in data:
