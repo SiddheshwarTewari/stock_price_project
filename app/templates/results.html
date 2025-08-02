@@ -24,11 +24,10 @@
                 </div>
             </div>
             <div class="card-body">
-                <div class="chart-container">
-                    <canvas class="stock-chart" 
-                            data-symbol="{{ symbol }}" 
-                            data-time-frame="{{ time_frame }}"
-                            height="300"></canvas>
+                <div class="chart-container" id="chartContainer" 
+                    data-symbol="{{ symbol }}" 
+                    data-time-frame="{{ time_frame }}">
+                    <canvas id="priceChart"></canvas>
                 </div>
             </div>
         </div>

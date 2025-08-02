@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from datetime import datetime, timedelta
 import requests
 from functools import wraps
+from .forms import StockForm
 
 bp = Blueprint('main', __name__)
 
@@ -11,9 +12,8 @@ def handle_api_errors(f):
         try:
             return f(*args, **kwargs)
         except requests.exceptions.RequestException as e:
+            current_app.logger.error(f'API Error: {str(e)}')
             return jsonify({'error': str(e)}), 500
-        except KeyError as e:
-            return jsonify({'error': f'Missing data in API response: {str(e)}'}), 500
         except Exception as e:
             current_app.logger.error(f'Unexpected error: {str(e)}')
             return jsonify({'error': 'An unexpected error occurred'}), 500
@@ -21,26 +21,29 @@ def handle_api_errors(f):
 
 @bp.route('/', methods=['GET', 'POST'])
 def index():
+    form = StockForm()
     symbol = request.args.get('symbol', 'AAPL').upper()
     time_frame = request.args.get('time_frame', 'daily')
-    
-    if request.method == 'POST':
-        symbol = request.form.get('symbol', 'AAPL').upper()
-        time_frame = request.form.get('time_frame', 'daily')
+
+    if form.validate_on_submit():
+        symbol = form.symbol.data.upper()
+        time_frame = form.time_frame.data
     
     data = fetch_stock_data(symbol, time_frame)
     
     if 'Error Message' in data:
         return render_template('index.html', 
-                             error=data['Error Message'],
-                             symbol=symbol,
-                             time_frame=time_frame)
+                            form=form,
+                            error=data['Error Message'],
+                            symbol=symbol,
+                            time_frame=time_frame)
     
     stats = calculate_stats(data, time_frame)
     recent_prices = get_recent_prices(data, time_frame)
     price_change, price_change_pct = calculate_price_change(data, time_frame)
     
     return render_template('results.html',
+                         form=form,
                          symbol=symbol,
                          time_frame=time_frame,
                          stats=stats,
@@ -54,8 +57,22 @@ def index():
 def api_stock(symbol):
     time_frame = request.args.get('time_frame', 'daily')
     data = fetch_stock_data(symbol, time_frame)
-    return jsonify(data)
+    
+    # Transform data for frontend
+    time_series_key = {
+        'daily': 'Time Series (Daily)',
+        'weekly': 'Weekly Time Series',
+        'monthly': 'Monthly Time Series'
+    }.get(time_frame, 'Time Series (Daily)')
+    
+    transformed = {
+        'symbol': symbol,
+        'time_frame': time_frame,
+        'series': data.get(time_series_key, {})
+    }
+    return jsonify(transformed)
 
+# Helper functions
 def fetch_stock_data(symbol, time_frame='daily'):
     api_key = current_app.config['ALPHA_VANTAGE_API_KEY']
     
@@ -87,7 +104,7 @@ def calculate_stats(data, time_frame):
     time_series = data.get(time_series_key, {})
     closing_prices = []
     
-    for values in time_series.values():
+    for date, values in time_series.items():
         try:
             closing_prices.append(float(values['4. close']))
         except (KeyError, ValueError):
