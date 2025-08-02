@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON TRADER // Cyberpunk Stock Terminal</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="cyber-container">
+        <header class="cyber-header">
+            <div class="corner corner-top-left"></div>
+            <div class="corner corner-top-right"></div>
+            <h1 class="glow">// NEON_TRADER 2.3.7</h1>
+            <div class="header-stats">
+                <span id="datetime" class="glow"></span>
+                <span id="system-status" class="status-active">SYSTEM: ONLINE</span>
+            </div>
+            <div class="corner corner-bottom-left"></div>
+            <div class="corner corner-bottom-right"></div>
+        </header>
+
+        <main class="cyber-main">
+            <section class="search-panel">
+                <div class="cyber-input-group">
+                    <input type="text" id="stock-input" class="cyber-input" placeholder="ENTER STOCK TICKER..." autocomplete="off">
+                    <button id="search-btn" class="cyber-button">
+                        <i class="fas fa-terminal"></i> QUERY
+                    </button>
+                    <button id="random-btn" class="cyber-button">
+                        <i class="fas fa-random"></i> RANDOM
+                    </button>
+                </div>
+                <div class="suggestions-container" id="suggestions"></div>
+            </section>
+
+            <section class="data-display">
+                <div class="cyber-card">
+                    <div class="card-header">
+                        <h2 id="stock-name" class="glow">STOCK_DATA</h2>
+                        <div class="card-ticker" id="stock-ticker">TICKER</div>
+                    </div>
+                    <div class="card-body">
+                        <div class="data-grid">
+                            <div class="data-item">
+                                <span class="data-label">PRICE</span>
+                                <span class="data-value" id="stock-price">--.--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">CHANGE</span>
+                                <span class="data-value" id="stock-change">--.--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">CHANGE %</span>
+                                <span class="data-value" id="stock-change-percent">--.--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">MARKET CAP</span>
+                                <span class="data-value" id="stock-market-cap">--.--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">PE RATIO</span>
+                                <span class="data-value" id="stock-pe">--.--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">52W HIGH</span>
+                                <span class="data-value" id="stock-high">--.--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">52W LOW</span>
+                                <span class="data-value" id="stock-low">--.--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">VOLUME</span>
+                                <span class="data-value" id="stock-volume">--.--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cyber-card chart-container">
+                    <div class="card-header">
+                        <h2 class="glow">PRICE_CHART</h2>
+                        <div class="time-filters">
+                            <button class="time-filter active" data-range="1d">24H</button>
+                            <button class="time-filter" data-range="5d">5D</button>
+                            <button class="time-filter" data-range="1m">1M</button>
+                            <button class="time-filter" data-range="1y">1Y</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="stock-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section class="news-panel">
+                <div class="cyber-card">
+                    <div class="card-header">
+                        <h2 class="glow">CORPORATE_NEWS</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="news-container" id="news-container">
+                            <div class="news-item placeholder">
+                                <div class="news-title">QUERY A STOCK TO LOAD NEWS FEED</div>
+                                <div class="news-source">NEON_TRADER NETWORK</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="cyber-footer">
+            <div class="corner corner-top-left"></div>
+            <div class="corner corner-top-right"></div>
+            <div class="footer-content">
+                <span class="glow">NEON_TRADER © 2077</span>
+                <span>// SYSTEM VERSION 2.3.7</span>
+                <span id="api-status">API: READY</span>
+            </div>
+            <div class="corner corner-bottom-left"></div>
+            <div class="corner corner-bottom-right"></div>
+        </footer>
+    </div>
+
+    <div class="scanlines"></div>
+    <div class="noise"></div>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

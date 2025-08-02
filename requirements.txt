@@ -1,8 +1,0 @@
-Flask==2.3.2
-Flask-WTF==1.2.1
-Flask-SQLAlchemy==3.1.1
-python-dotenv==1.0.0
-requests==2.31.0
-gunicorn==20.1.0
-flask-caching==2.1.0
-setuptools<81.0.0
