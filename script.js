@@ -192,6 +192,11 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('stockChartContainer').classList.add('hidden');
         }
     }
+
+    console.log('Chart data:', {
+        labels: data.t.map(t => new Date(t * 1000)),
+        values: data.c
+    });
     
     // News Feed
     async function fetchNews(ticker) {
