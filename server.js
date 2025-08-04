@@ -19,9 +19,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Hardcoded Alpha Vantage API Key
 const ALPHA_VANTAGE_KEY = 'RBXMFITJ8OMCM8HA';
 
-// Cache implementation
+// Simple TTL Cache implementation
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+function setCache(key, value, duration = CACHE_DURATION) {
+  cache.set(key, {
+    value,
+    expires: Date.now() + duration
+  });
+}
+
+function getCache(key) {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expires) {
+    cache.delete(key);
+    return undefined;
+  }
+  return entry.value;
+}
 
 // API Routes
 app.get('/api/search', async (req, res) => {
@@ -29,8 +46,9 @@ app.get('/api/search', async (req, res) => {
     const { query } = req.query;
     const cacheKey = `search-${query}`;
     
-    if (cache.has(cacheKey)) {
-      return res.json(cache.get(cacheKey));
+    const cached = getCache(cacheKey);
+    if (cached !== undefined) {
+      return res.json(cached);
     }
 
     const response = await axios.get(
@@ -45,7 +63,7 @@ app.get('/api/search', async (req, res) => {
       name: match['2. name']
     })) || [];
     
-    cache.set(cacheKey, results, CACHE_DURATION);
+    setCache(cacheKey, results, CACHE_DURATION);
     res.json(results);
   } catch (error) {
     console.error('Search error:', error);
@@ -58,8 +76,9 @@ app.get('/api/quote', async (req, res) => {
     const { symbol } = req.query;
     const cacheKey = `quote-${symbol}`;
     
-    if (cache.has(cacheKey)) {
-      return res.json(cache.get(cacheKey));
+    const cached = getCache(cacheKey);
+    if (cached !== undefined) {
+      return res.json(cached);
     }
 
     const response = await axios.get(
@@ -73,11 +92,11 @@ app.get('/api/quote', async (req, res) => {
     const result = {
       price: parseFloat(quote['05. price']),
       change: parseFloat(quote['09. change']),
-      changePercent: parseFloat(quote['10. change percent']),
+      changePercent: parseFloat((quote['10. change percent'] || '').replace('%', '')),
       volume: parseInt(quote['06. volume'])
     };
     
-    cache.set(cacheKey, result, CACHE_DURATION);
+    setCache(cacheKey, result, CACHE_DURATION);
     res.json(result);
   } catch (error) {
     console.error('Quote error:', error);
@@ -90,8 +109,9 @@ app.get('/api/company', async (req, res) => {
     const { symbol } = req.query;
     const cacheKey = `company-${symbol}`;
     
-    if (cache.has(cacheKey)) {
-      return res.json(cache.get(cacheKey));
+    const cached = getCache(cacheKey);
+    if (cached !== undefined) {
+      return res.json(cached);
     }
 
     const response = await axios.get(
@@ -110,10 +130,11 @@ app.get('/api/company', async (req, res) => {
       peRatio: data.PERatio,
       dividendYield: data.DividendYield,
       high52: data['52WeekHigh'],
-      low52: data['52WeekLow']
+      low52: data['52WeekLow'],
+      symbol: data.Symbol // Add symbol for UI
     };
     
-    cache.set(cacheKey, result, CACHE_DURATION);
+    setCache(cacheKey, result, CACHE_DURATION);
     res.json(result);
   } catch (error) {
     console.error('Company error:', error);
@@ -126,8 +147,9 @@ app.get('/api/historical', async (req, res) => {
     const { symbol, range } = req.query;
     const cacheKey = `historical-${symbol}-${range}`;
     
-    if (cache.has(cacheKey)) {
-      return res.json(cache.get(cacheKey));
+    const cached = getCache(cacheKey);
+    if (cached !== undefined) {
+      return res.json(cached);
     }
 
     let functionName, interval = '';
@@ -152,29 +174,34 @@ app.get('/api/historical', async (req, res) => {
     const data = response.data;
     if (data.Note) throw new Error('API rate limit reached');
     
-    const timeSeries = data[`Time Series (${range === '1d' ? '5min' : 'Daily'})`] || {};
+    let timeSeries;
+    if (range === '1d') {
+      timeSeries = data['Time Series (5min)'] || {};
+    } else {
+      timeSeries = data['Time Series (Daily)'] || {};
+    }
     const timePoints = Object.keys(timeSeries).sort();
-    
+
     const labels = [];
     const prices = [];
-    
+
     timePoints.forEach(time => {
       labels.push(time);
       prices.push(parseFloat(timeSeries[time]['4. close']));
     });
-    
+
     // Limit data points based on range
     let limit = 100;
     if (range === '1d') limit = 24 * 12; // 5min intervals for 24 hours
     if (range === '1w') limit = 7;
     if (range === '1m') limit = 30;
-    
+
     const result = {
       labels: labels.slice(0, limit).reverse(),
       data: prices.slice(0, limit).reverse()
     };
-    
-    cache.set(cacheKey, result, CACHE_DURATION);
+
+    setCache(cacheKey, result, CACHE_DURATION);
     res.json(result);
   } catch (error) {
     console.error('Historical error:', error);
@@ -187,8 +214,9 @@ app.get('/api/news', async (req, res) => {
     const { symbol } = req.query;
     const cacheKey = `news-${symbol}`;
     
-    if (cache.has(cacheKey)) {
-      return res.json(cache.get(cacheKey));
+    const cached = getCache(cacheKey);
+    if (cached !== undefined) {
+      return res.json(cached);
     }
 
     // First try Alpha Vantage
@@ -206,7 +234,7 @@ app.get('/api/news', async (req, res) => {
           url: item.url,
           date: item.time_published
         }));
-        cache.set(cacheKey, news, CACHE_DURATION);
+        setCache(cacheKey, news, CACHE_DURATION);
         return res.json(news);
       }
     } catch (avError) {
@@ -222,10 +250,10 @@ app.get('/api/news', async (req, res) => {
       title: item.title,
       source: item.publisher,
       url: item.link,
-      date: new Date(item.providerPublishTime).toISOString()
+      date: new Date(item.providerPublishTime * 1000).toISOString()
     })) || [];
     
-    cache.set(cacheKey, news, CACHE_DURATION);
+    setCache(cacheKey, news, CACHE_DURATION);
     res.json(news);
   } catch (error) {
     console.error('News error:', error);
