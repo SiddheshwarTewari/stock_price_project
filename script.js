@@ -11,9 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Finnhub API Key
     const FINNHUB_API_KEY = 'd283nthr01qr2iauh510d283nthr01qr2iauh51g';
     
-    // Chart instance
-    let stockChart;
-    
     // Load recent tickers from localStorage
     let recentTickers = JSON.parse(localStorage.getItem('recentTickers')) || [];
     updateRecentTickersDisplay();
@@ -43,7 +40,6 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingElement.classList.remove('hidden');
         errorElement.classList.add('hidden');
         stockInfoElement.classList.add('hidden');
-        document.getElementById('stockChartContainer').classList.add('hidden');
         document.getElementById('newsContainer').classList.add('hidden');
         
         try {
@@ -53,7 +49,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // Fetch Company Profile
             const profileData = await fetchFinnhubData(`stock/profile2?symbol=${ticker}`);
             
-            // Update UI with basic stock info
+            // Fetch Financial Metrics
+            const metricsData = await fetchFinnhubData(`stock/metric?symbol=${ticker}&metric=all`);
+            
+            // Fetch Recommendations
+            const recommendationsData = await fetchFinnhubData(`stock/recommendation?symbol=${ticker}`);
+            
+            // Fetch Peers
+            const peersData = await fetchFinnhubData(`stock/peers?symbol=${ticker}`);
+            
+            // Fetch Earnings Calendar
+            const earningsData = await fetchFinnhubData(`calendar/earnings?symbol=${ticker}&limit=3`);
+            
+            // Update UI with all data
             updateStockInfo({
                 ticker,
                 companyName: profileData.name || ticker,
@@ -64,17 +72,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 open: quoteData.o || '-',
                 high: quoteData.h || '-',
                 low: quoteData.l || '-',
-                marketCap: profileData.marketCapitalization ? formatMarketCap(profileData.marketCapitalization) : '-'
+                yearRange: metricsData.metric['52WeekHigh'] && metricsData.metric['52WeekLow'] 
+                    ? `${metricsData.metric['52WeekLow'].toFixed(2)} - ${metricsData.metric['52WeekHigh'].toFixed(2)}` 
+                    : '-',
+                marketCap: profileData.marketCapitalization ? formatMarketCap(profileData.marketCapitalization) : '-',
+                peRatio: metricsData.metric.peNormalizedAnnual ? metricsData.metric.peNormalizedAnnual.toFixed(2) : '-',
+                eps: metricsData.metric.epsNormalizedAnnual ? metricsData.metric.epsNormalizedAnnual.toFixed(2) : '-',
+                dividend: metricsData.metric.dividendYieldIndicatedAnnual 
+                    ? (metricsData.metric.dividendYieldIndicatedAnnual * 100).toFixed(2) + '%' 
+                    : '-',
+                beta: metricsData.metric.beta ? metricsData.metric.beta.toFixed(2) : '-'
             });
+            
+            // Update recommendations
+            updateRecommendations(recommendationsData);
+            
+            // Update peers
+            updatePeers(peersData);
+            
+            // Update earnings calendar
+            updateEarningsCalendar(earningsData.earningsCalendar || []);
             
             // Add to recent tickers
             updateRecentTickers(ticker);
             
-            // Fetch and render additional data
-            await Promise.all([
-                renderStockChart(ticker),
-                fetchNews(ticker)
-            ]);
+            // Fetch news
+            await fetchNews(ticker);
             
             // Show all sections
             loadingElement.classList.add('hidden');
@@ -95,121 +118,113 @@ document.addEventListener('DOMContentLoaded', function() {
         return await response.json();
     }
     
-    // Stock Chart Rendering
-    // In the renderStockChart function, replace with this updated version:
-    // Chart instance
-    async function renderStockChart(ticker) {
-        try {
-            // Clear previous chart
-            if (stockChart) stockChart.destroy();
-
-            // Show loading state for chart
-            document.getElementById('stockChartContainer').classList.add('hidden');
-            const chartLoading = document.createElement('div');
-            chartLoading.className = 'loading-chart';
-            chartLoading.innerHTML = '<p>LOADING CHART DATA...</p>';
-            document.getElementById('stockChartContainer').appendChild(chartLoading);
-
-            // API URL with correct parameters
-            const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${Math.floor(Date.now() / 1000) - 2592000}&to=${Math.floor(Date.now() / 1000)}&token=${FINNHUB_API_KEY}`;
-            
-            const response = await fetch(url);
-            const chartData = await response.json();
-            
-            if (chartData.s !== "ok" || !chartData.c || chartData.c.length === 0) {
-                throw new Error('Invalid chart data received');
-            }
-
-            // Remove loading element
-            document.getElementById('stockChartContainer').removeChild(chartLoading);
-
-            // Get canvas and ensure proper dimensions
-            const ctx = document.getElementById('stockChart');
-            ctx.width = ctx.offsetWidth;
-            ctx.height = ctx.offsetHeight;
-
-            // Create new chart with real data
-            stockChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: chartData.t.map(t => 
-                        new Date(t * 1000).toLocaleDateString('en-US', 
-                        { month: 'short', day: 'numeric' })),
-                    datasets: [{
-                        label: 'Price',
-                        data: chartData.c,
-                        borderColor: '#0ff0fc',
-                        backgroundColor: 'rgba(0, 255, 252, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.1,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { 
-                            grid: { display: false },
-                            ticks: { maxRotation: 0 }
-                        },
-                        y: {
-                            ticks: {
-                                callback: value => `$${value.toFixed(2)}`
-                            }
-                        }
-                    }
-                }
-            });
-
-            document.getElementById('stockChartContainer').classList.remove('hidden');
-            
-        } catch (error) {
-            console.error("Chart error:", error);
-            // Remove loading element if it exists
-            const chartLoading = document.querySelector('.loading-chart');
-            if (chartLoading) {
-                document.getElementById('stockChartContainer').removeChild(chartLoading);
-            }
-            
-            // Show error message instead of test data
-            const errorMsg = document.createElement('div');
-            errorMsg.className = 'error-message';
-            errorMsg.innerHTML = '<p>CHART DATA UNAVAILABLE</p>';
-            document.getElementById('stockChartContainer').appendChild(errorMsg);
-            document.getElementById('stockChartContainer').classList.remove('hidden');
+    // Update recommendations
+    function updateRecommendations(data) {
+        const recommendationsElement = document.getElementById('recommendations');
+        recommendationsElement.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+            recommendationsElement.innerHTML = '<p>No recommendations available</p>';
+            return;
         }
+        
+        // Get latest recommendation
+        const latest = data[0];
+        
+        // Create recommendation summary
+        const summary = document.createElement('p');
+        summary.innerHTML = `Consensus: <span class="${getRecommendationClass(latest.consensus)}">${latest.consensus}</span>`;
+        recommendationsElement.appendChild(summary);
+        
+        // Create recommendation bar
+        const bar = document.createElement('div');
+        bar.className = 'recommendation-bar';
+        
+        const segments = [
+            { label: 'Strong Buy', value: latest.strongBuy, color: '#2ecc71' },
+            { label: 'Buy', value: latest.buy, color: '#27ae60' },
+            { label: 'Hold', value: latest.hold, color: '#f39c12' },
+            { label: 'Sell', value: latest.sell, color: '#e74c3c' },
+            { label: 'Strong Sell', value: latest.strongSell, color: '#c0392b' }
+        ];
+        
+        segments.forEach(segment => {
+            if (segment.value > 0) {
+                const segmentElement = document.createElement('div');
+                segmentElement.className = 'recommendation-segment';
+                segmentElement.style.width = `${segment.value * 20}%`;
+                segmentElement.style.backgroundColor = segment.color;
+                segmentElement.title = `${segment.label}: ${segment.value}`;
+                bar.appendChild(segmentElement);
+            }
+        });
+        
+        recommendationsElement.appendChild(bar);
+        
+        // Add period info
+        const period = document.createElement('p');
+        period.style.fontSize = '12px';
+        period.style.marginTop = '5px';
+        period.textContent = `As of ${new Date(latest.period).toLocaleDateString()}`;
+        recommendationsElement.appendChild(period);
     }
     
-    // News Feed
-    async function fetchNews(ticker) {
-        try {
-            const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            const toDate = new Date().toISOString().split('T')[0];
+    function getRecommendationClass(consensus) {
+        if (consensus >= 4) return 'positive';
+        if (consensus >= 2.5) return '';
+        return 'negative';
+    }
+    
+    // Update peers
+    function updatePeers(peers) {
+        const peersElement = document.getElementById('peers');
+        peersElement.innerHTML = '';
+        
+        if (!peers || peers.length === 0) {
+            peersElement.innerHTML = '<p>No peers data available</p>';
+            return;
+        }
+        
+        peers.slice(0, 10).forEach(peer => {
+            const peerElement = document.createElement('div');
+            peerElement.className = 'peer-ticker';
+            peerElement.textContent = peer;
+            peerElement.addEventListener('click', () => {
+                tickerInput.value = peer;
+                fetchStockData();
+            });
+            peersElement.appendChild(peerElement);
+        });
+    }
+    
+    // Update earnings calendar
+    function updateEarningsCalendar(earnings) {
+        const earningsElement = document.getElementById('earningsCalendar');
+        earningsElement.innerHTML = '';
+        
+        if (!earnings || earnings.length === 0) {
+            earningsElement.innerHTML = '<p>No upcoming earnings data</p>';
+            return;
+        }
+        
+        earnings.forEach(earning => {
+            const earningItem = document.createElement('div');
+            earningItem.className = 'earnings-item';
             
-            const news = await fetchFinnhubData(`company-news?symbol=${ticker}&from=${fromDate}&to=${toDate}`);
-            
-            const newsFeed = document.getElementById('newsFeed');
-            newsFeed.innerHTML = '';
-            
-            news.slice(0, 5).forEach(item => {
-                if (item.headline && item.url) {
-                    const newsItem = document.createElement('div');
-                    newsItem.className = 'news-item';
-                    newsItem.innerHTML = `
-                        <h3>${item.headline}</h3>
-                        <p>${item.summary || 'No summary available.'}</p>
-                        <a href="${item.url}" target="_blank">Read more →</a>
-                    `;
-                    newsFeed.appendChild(newsItem);
-                }
+            const date = new Date(earning.date);
+            const formattedDate = date.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric' 
             });
             
-            document.getElementById('newsContainer').classList.remove('hidden');
-        } catch (error) {
-            console.error('Failed to load news:', error);
-        }
+            earningItem.innerHTML = `
+                <span class="earnings-date">${formattedDate}</span>
+                <span>EPS Estimate: <span class="earnings-estimate">${earning.epsEstimate ? earning.epsEstimate.toFixed(2) : '-'}</span></span>
+            `;
+            
+            earningsElement.appendChild(earningItem);
+        });
     }
     
     // Recent Tickers Management
@@ -263,8 +278,42 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('prevClose').textContent = `$${data.prevClose.toFixed(2)}`;
         document.getElementById('open').textContent = `$${data.open.toFixed(2)}`;
         document.getElementById('dayRange').textContent = `$${data.low.toFixed(2)} - $${data.high.toFixed(2)}`;
-        document.getElementById('yearRange').textContent = data.yearRange || '-';
+        document.getElementById('yearRange').textContent = data.yearRange;
         document.getElementById('marketCap').textContent = data.marketCap;
+        document.getElementById('peRatio').textContent = data.peRatio;
+        document.getElementById('eps').textContent = data.eps;
+        document.getElementById('dividend').textContent = data.dividend;
+        document.getElementById('beta').textContent = data.beta;
+    }
+    
+    // News Feed
+    async function fetchNews(ticker) {
+        try {
+            const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const toDate = new Date().toISOString().split('T')[0];
+            
+            const news = await fetchFinnhubData(`company-news?symbol=${ticker}&from=${fromDate}&to=${toDate}`);
+            
+            const newsFeed = document.getElementById('newsFeed');
+            newsFeed.innerHTML = '';
+            
+            news.slice(0, 5).forEach(item => {
+                if (item.headline && item.url) {
+                    const newsItem = document.createElement('div');
+                    newsItem.className = 'news-item';
+                    newsItem.innerHTML = `
+                        <h3>${item.headline}</h3>
+                        <p>${item.summary || 'No summary available.'}</p>
+                        <a href="${item.url}" target="_blank">Read more →</a>
+                    `;
+                    newsFeed.appendChild(newsItem);
+                }
+            });
+            
+            document.getElementById('newsContainer').classList.remove('hidden');
+        } catch (error) {
+            console.error('Failed to load news:', error);
+        }
     }
     
     function showError(message) {

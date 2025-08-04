@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="terminal">
@@ -17,7 +16,7 @@
                 <span class="terminal-btn yellow"></span>
                 <span class="terminal-btn green"></span>
             </div>
-            <div class="terminal-title">NEONSTOCK v2.4.1</div>
+            <div class="terminal-title">NEONSTOCK v2.5</div>
         </div>
         <div class="terminal-body">
             <div class="scanlines"></div>
@@ -74,12 +73,30 @@
                             <p>DAY RANGE: <span id="dayRange">-</span></p>
                             <p>52WK RANGE: <span id="yearRange">-</span></p>
                         </div>
+                        <div class="data-column">
+                            <h3>FINANCIAL METRICS</h3>
+                            <p>PE RATIO: <span id="peRatio">-</span></p>
+                            <p>EPS: <span id="eps">-</span></p>
+                            <p>DIVIDEND: <span id="dividend">-</span></p>
+                            <p>BETA: <span id="beta">-</span></p>
+                        </div>
                     </div>
-                </div>
-                
-                <div id="stockChartContainer" class="hidden">
-                    <h2>PRICE MOVEMENT (30 DAYS)</h2>
-                    <canvas id="stockChart"></canvas>
+                    
+                    <div class="additional-data">
+                        <div class="data-column">
+                            <h3>ANALYST RECOMMENDATIONS</h3>
+                            <div id="recommendations"></div>
+                        </div>
+                        <div class="data-column">
+                            <h3>COMPANY PEERS</h3>
+                            <div id="peers" class="peers-container"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="data-column full-width">
+                        <h3>UPCOMING EARNINGS</h3>
+                        <div id="earningsCalendar"></div>
+                    </div>
                 </div>
                 
                 <div id="newsContainer" class="hidden">

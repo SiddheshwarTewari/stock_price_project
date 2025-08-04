@@ -251,6 +251,11 @@ h1 {
     padding: 15px;
 }
 
+.data-column.full-width {
+    flex: 100%;
+    min-width: 100%;
+}
+
 .data-column h3 {
     font-family: 'Orbitron', sans-serif;
     color: var(--neon-blue);
@@ -272,24 +277,63 @@ h1 {
     font-weight: 500;
 }
 
-#stockChartContainer {
-    margin-top: 30px;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 20px;
+.recommendation-bar {
+    display: flex;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.1);
     border-radius: 4px;
-    border: 1px solid var(--neon-blue);
+    overflow: hidden;
+    margin: 10px 0;
 }
 
-#stockChartContainer h2 {
-    font-family: 'Orbitron', sans-serif;
+.recommendation-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.peers-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.peer-ticker {
+    background: rgba(255, 42, 109, 0.1);
     color: var(--neon-pink);
-    margin-bottom: 15px;
-    font-size: 16px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 1px solid transparent;
 }
 
-#stockChart {
-    width: 100%;
-    height: 300px;
+.peer-ticker:hover {
+    background: rgba(255, 42, 109, 0.3);
+    border-color: var(--neon-pink);
+}
+
+.earnings-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.earnings-item:last-child {
+    border-bottom: none;
+}
+
+.earnings-date {
+    color: var(--neon-blue);
+}
+
+.earnings-estimate {
+    color: var(--neon-purple);
 }
 
 #newsContainer {
