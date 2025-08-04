@@ -97,65 +97,41 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Stock Chart Rendering
     // In the renderStockChart function, replace with this updated version:
-    // Replace your current renderStockChart function with this:
     async function renderStockChart(ticker) {
         try {
-            // Fetch 30 days of price data
-            const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&count=30&token=${FINNHUB_API_KEY}`;
-            const response = await fetch(url);
-            const data = await response.json();
-
-            // Only proceed if we have valid data
-            if (data.s !== "ok" || !data.c || data.c.length === 0) {
-                throw new Error('No price data available');
-            }
-
-            // Get canvas element and set dimensions
-            // ...existing code...
-            const ctx = document.getElementById('stockChart').getContext('2d');
-            // ...existing code...
-
-            // Destroy previous chart if exists
+            // TEST DATA - comment this out when API works
+            const testData = {
+                s: "ok",
+                c: [142.12, 141.34, 143.78, 144.56, 142.89, 145.22, 146.35, 147.01, 145.89, 146.45],
+                t: Array.from({length: 10}, (_,i) => Math.floor(Date.now()/1000) - (i * 86400))
+            };
+            
+            // Uncomment this when API works:
+            // const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&count=30&token=${FINNHUB_API_KEY}`;
+            // const testData = await fetch(url).then(r => r.json());
+            
+            if (testData.s !== "ok") throw new Error('No data');
+            
+            const ctx = document.getElementById('stockChart');
             if (stockChart) stockChart.destroy();
-
-            // Create simple line graph
+            
             stockChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: data.t.map(t => new Date(t * 1000).toLocaleDateString()),
+                    labels: testData.t.map(t => new Date(t * 1000).toLocaleDateString()),
                     datasets: [{
                         label: 'Price',
-                        data: data.c,
-                        borderColor: '#0ff0fc', // Neon blue
-                        borderWidth: 2,
-                        tension: 0.1,
-                        pointRadius: 0 // Remove data points for cleaner look
+                        data: testData.c,
+                        borderColor: '#0ff0fc',
+                        borderWidth: 2
                     }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false } // Hide legend
-                    },
-                    scales: {
-                        x: { display: false }, // Hide x-axis labels for simplicity
-                        y: {
-                            ticks: {
-                                callback: function(value) {
-                                    return '$' + value.toFixed(2); // Format as currency
-                                }
-                            }
-                        }
-                    }
                 }
             });
-
-            // Show the graph container
+            
             document.getElementById('stockChartContainer').classList.remove('hidden');
             
         } catch (error) {
-            console.error('Failed to create graph:', error);
+            console.error("Graph error:", error);
             document.getElementById('stockChartContainer').classList.add('hidden');
         }
     }
