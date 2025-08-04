@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const recentTickersElement = document.getElementById('recentTickers');
     const datetimeElement = document.getElementById('datetime');
     
+    // Finnhub API Key
+    const FINNHUB_API_KEY = 'd2837khr01qr2iauetf0d2837khr01qr2iauetfg';
+    
     // Load recent tickers from localStorage
     let recentTickers = JSON.parse(localStorage.getItem('recentTickers')) || [];
     updateRecentTickersDisplay();
@@ -38,76 +41,44 @@ document.addEventListener('DOMContentLoaded', function() {
         stockInfoElement.classList.add('hidden');
         
         try {
-            // Using Yahoo Finance's API directly with JSONP approach
-            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
+            // Fetch quote data (price, change, etc.)
+            const quoteUrl = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_API_KEY}`;
+            const quoteResponse = await fetch(quoteUrl);
             
-            // We'll use a CORS proxy as a fallback
-            const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-            
-            let response;
-            
-            // First try direct API call
-            try {
-                response = await fetch(url, {
-                    headers: {
-                        'Origin': window.location.origin
-                    }
-                });
-                
-                if (!response.ok) throw new Error('Direct API failed');
-            } catch (e) {
-                // If direct API fails, try with CORS proxy
-                console.log('Trying with CORS proxy');
-                response = await fetch(proxyUrl + url, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                });
+            if (!quoteResponse.ok) {
+                throw new Error('Failed to fetch quote data');
             }
             
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
+            const quoteData = await quoteResponse.json();
+            
+            // Fetch company profile (name, market cap, etc.)
+            const profileUrl = `https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_API_KEY}`;
+            const profileResponse = await fetch(profileUrl);
+            
+            if (!profileResponse.ok) {
+                throw new Error('Failed to fetch company profile');
             }
             
-            const data = await response.json();
+            const profileData = await profileResponse.json();
             
-            // Check if data is valid
-            if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
-                throw new Error('No data available for this ticker');
-            }
-            
-            const result = data.chart.result[0];
-            const meta = result.meta;
-            
-            // For additional data, we'll use a different endpoint
-            const summaryUrl = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`;
-            let summaryResponse = await fetch(proxyUrl + summaryUrl, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-            
-            if (!summaryResponse.ok) {
-                throw new Error('Could not fetch additional data');
-            }
-            
-            const summaryData = await summaryResponse.json();
-            const quoteSummary = summaryData.quoteSummary.result[0].price;
+            // Calculate change percentage
+            const changePercent = quoteData.dp || 0;
+            const change = quoteData.d || 0;
+            const prevClose = quoteData.pc || 0;
             
             // Update the UI with the fetched data
             updateStockInfo({
                 ticker,
-                companyName: quoteSummary.longName || ticker,
-                price: meta.regularMarketPrice,
-                change: meta.regularMarketPrice - meta.chartPreviousClose,
-                changePercent: ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100,
-                prevClose: meta.chartPreviousClose.toFixed(2),
-                open: quoteSummary.regularMarketOpen?.fmt || '-',
-                dayRange: `${quoteSummary.regularMarketDayLow?.fmt || '-'} - ${quoteSummary.regularMarketDayHigh?.fmt || '-'}`,
-                yearRange: quoteSummary.fiftyTwoWeekRange?.fmt || '-',
-                volume: quoteSummary.regularMarketVolume?.fmt || '-',
-                avgVolume: quoteSummary.averageDailyVolume3Month?.fmt || '-',
-                marketCap: quoteSummary.marketCap?.fmt || '-'
+                companyName: profileData.name || ticker,
+                price: quoteData.c || 0,
+                change: change,
+                changePercent: changePercent,
+                prevClose: prevClose,
+                open: quoteData.o || '-',
+                high: quoteData.h || '-',
+                low: quoteData.l || '-',
+                marketCap: profileData.marketCapitalization ? `$${(profileData.marketCapitalization / 1000000000).toFixed(2)}B` : '-',
+                currency: profileData.currency || 'USD'
             });
             
             // Add to recent tickers if not already there
@@ -158,12 +129,9 @@ document.addEventListener('DOMContentLoaded', function() {
             changePercentElement.className = 'negative';
         }
         
-        document.getElementById('prevClose').textContent = `$${data.prevClose}`;
-        document.getElementById('open').textContent = data.open;
-        document.getElementById('dayRange').textContent = data.dayRange;
-        document.getElementById('yearRange').textContent = data.yearRange;
-        document.getElementById('volume').textContent = data.volume;
-        document.getElementById('avgVolume').textContent = data.avgVolume;
+        document.getElementById('prevClose').textContent = `$${data.prevClose.toFixed(2)}`;
+        document.getElementById('open').textContent = `$${data.open.toFixed(2)}`;
+        document.getElementById('dayRange').textContent = `$${data.low.toFixed(2)} - $${data.high.toFixed(2)}`;
         document.getElementById('marketCap').textContent = data.marketCap;
     }
     
