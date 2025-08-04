@@ -89,6 +89,10 @@ app.get('/api/quote', async (req, res) => {
     if (data.Note) throw new Error('API rate limit reached');
     
     const quote = data['Global Quote'] || {};
+    // Check if quote is valid (Alpha Vantage returns empty object for invalid symbol)
+    if (!quote['01. symbol']) {
+      return res.status(404).json({});
+    }
     const result = {
       price: parseFloat(quote['05. price']),
       change: parseFloat(quote['09. change']),
@@ -120,7 +124,10 @@ app.get('/api/company', async (req, res) => {
     
     const data = response.data;
     if (data.Note) throw new Error('API rate limit reached');
-    
+    // Alpha Vantage returns {} for invalid symbol
+    if (!data.Symbol) {
+      return res.status(404).json({});
+    }
     const result = {
       name: data.Name,
       description: data.Description,
