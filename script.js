@@ -99,104 +99,74 @@ document.addEventListener('DOMContentLoaded', function() {
     // In the renderStockChart function, replace with this updated version:
     async function renderStockChart(ticker) {
         try {
-            const data = await fetchFinnhubData(`stock/candle?symbol=${ticker}&resolution=D&count=30&token=${FINNHUB_API_KEY}`);
+            console.log(`Fetching chart data for ${ticker}`); // Debug 1
+            
+            const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&count=30&token=${FINNHUB_API_KEY}`;
+            console.log("API URL:", url); // Debug 2
+            
+            const response = await fetch(url);
+            console.log("Response status:", response.status); // Debug 3
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log("Chart data received:", data); // Debug 4
             
             // Check if we have valid data
-            if (!data || !data.c || data.c.length === 0) {
-                console.error('No valid chart data received');
-                return;
+            if (!data || data.s !== "ok" || !data.c || data.c.length === 0) {
+                console.error('No valid chart data:', {
+                    status: data.s,
+                    closingPrices: data.c ? data.c.length : 0,
+                    timestamps: data.t ? data.t.length : 0
+                });
+                throw new Error('Invalid chart data received');
             }
 
-            const ctx = document.getElementById('stockChart').getContext('2d');
+            const ctx = document.getElementById('stockChart');
+            if (!ctx) {
+                throw new Error('Chart canvas element not found');
+            }
             
-            // Destroy previous chart if it exists
+            console.log("Creating chart with:", {
+                dates: data.t.map(t => new Date(t * 1000)),
+                prices: data.c
+            }); // Debug 5
+
             if (stockChart) {
                 stockChart.destroy();
             }
 
-            // Create new chart
-            stockChart = new Chart(ctx, {
+            stockChart = new Chart(ctx.getContext('2d'), {
                 type: 'line',
                 data: {
-                    labels: data.t.map(timestamp => {
-                        const date = new Date(timestamp * 1000);
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    }),
+                    labels: data.t.map(t => new Date(t * 1000).toLocaleDateString()),
                     datasets: [{
                         label: 'Price',
                         data: data.c,
-                        borderColor: 'var(--neon-blue)',
+                        borderColor: '#0ff0fc',
                         backgroundColor: 'rgba(0, 255, 252, 0.1)',
                         borderWidth: 2,
-                        tension: 0.1,
-                        fill: true,
-                        pointRadius: 0 // Remove points for cleaner look
+                        tension: 0.1
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            callbacks: {
-                                label: function(context) {
-                                    return `$${context.parsed.y.toFixed(2)}`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                display: false,
-                                color: 'rgba(255, 255, 255, 0.1)'
-                            },
-                            ticks: {
-                                color: 'var(--text-color)',
-                                maxRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: 10
-                            }
-                        },
-                        y: {
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'
-                            },
-                            ticks: {
-                                color: 'var(--text-color)',
-                                callback: function(value) {
-                                    return `$${value}`;
-                                }
-                            }
-                        }
-                    },
-                    interaction: {
-                        mode: 'nearest',
-                        axis: 'x',
-                        intersect: false
+                        legend: { display: false }
                     }
                 }
             });
 
-            // Make sure to show the container
+            console.log("Chart created successfully"); // Debug 6
             document.getElementById('stockChartContainer').classList.remove('hidden');
             
         } catch (error) {
-            console.error('Failed to load chart:', error);
-            // Hide chart container if there's an error
+            console.error('Chart error:', error);
             document.getElementById('stockChartContainer').classList.add('hidden');
         }
     }
-
-    console.log('Chart data:', {
-        labels: data.t.map(t => new Date(t * 1000)),
-        values: data.c
-    });
     
     // News Feed
     async function fetchNews(ticker) {
