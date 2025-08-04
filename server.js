@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Alpha Vantage API Key (using your provided key)
-const ALPHA_VANTAGE_KEY = 'W92E3Q6TGRVOVQR6';
+const ALPHA_VANTAGE_KEY = 'RBXMFITJ8OMCM8HA';
 
 // Cache to prevent hitting API rate limits
 const cache = {
