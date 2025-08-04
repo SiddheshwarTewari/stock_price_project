@@ -7,55 +7,53 @@ document.addEventListener('DOMContentLoaded', function() {
     const stockInfoElement = document.getElementById('stockInfo');
     const recentTickersElement = document.getElementById('recentTickers');
     const datetimeElement = document.getElementById('datetime');
-
+    
     // API Configuration
     const API_KEY = 'd2837khr01qr2iauetf0d2837khr01qr2iauetfg';
     const API_BASE_URL = 'https://finnhub.io/api/v1';
     
     // Chart instance
     let stockChart;
-    let chartTimeframe = 'D'; // Daily by default
-    let currentTicker = 'AAPL';
-
+    
     // Initialize
     updateDateTime();
     setInterval(updateDateTime, 1000);
-    fetchStockData('AAPL');
+    tickerInput.value = 'AAPL';
+    fetchStockData();
 
     // Event Listeners
-    searchBtn.addEventListener('click', () => fetchStockData(tickerInput.value.trim()));
-    tickerInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') fetchStockData(tickerInput.value.trim());
+    searchBtn.addEventListener('click', fetchStockData);
+    tickerInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') fetchStockData();
     });
 
     // Main Stock Data Fetch Function
-    async function fetchStockData(ticker) {
-        ticker = ticker.toUpperCase();
-        currentTicker = ticker;
-        tickerInput.value = ticker;
-
+    async function fetchStockData() {
+        const ticker = tickerInput.value.trim().toUpperCase();
+        
         if (!ticker) {
             showError("Please enter a ticker symbol");
             return;
         }
-
+        
         // UI State Management
         loadingElement.classList.remove('hidden');
         errorElement.classList.add('hidden');
         stockInfoElement.classList.add('hidden');
         document.getElementById('stockChartContainer').classList.add('hidden');
         document.getElementById('newsContainer').classList.add('hidden');
-
+        
         try {
-            // Fetch all data in parallel
+            // Fetch data using Promise.all for parallel requests
             const [quoteData, profileData] = await Promise.all([
                 fetchWithFallback(`quote?symbol=${ticker}`),
                 fetchWithFallback(`stock/profile2?symbol=${ticker}`)
             ]);
 
             // Validate data
-            if (!quoteData || !quoteData.c) throw new Error("No price data available");
-            if (!profileData) throw new Error("No company data available");
+            if (!quoteData || typeof quoteData.c !== 'number' || !profileData) {
+                throw new Error('Invalid data received from API');
+            }
 
             // Update UI
             updateStockInfo({
@@ -72,85 +70,82 @@ document.addEventListener('DOMContentLoaded', function() {
                     formatMarketCap(profileData.marketCapitalization) : '-'
             });
 
-            // Load additional data
-            await Promise.all([
-                renderStockChart(ticker),
-                fetchNews(ticker)
-            ]);
+            // Load chart and news
+            await renderStockChart(ticker);
+            await fetchNews(ticker);
 
             // Update recent tickers
             updateRecentTickers(ticker);
-
+            
             // Show content
             loadingElement.classList.add('hidden');
             stockInfoElement.classList.remove('hidden');
+            
         } catch (error) {
             console.error('Fetch error:', error);
-            showError("Failed to fetch data. Please check the ticker and try again.");
+            showError("Service temporarily unavailable. Please try again later.");
             loadingElement.classList.add('hidden');
             errorElement.classList.remove('hidden');
         }
     }
-
+    
     // Improved fetch with retry logic
     async function fetchWithFallback(endpoint) {
+        const url = `${API_BASE_URL}/${endpoint}&token=${API_KEY}`;
+        
         try {
-            // Try direct API call first
-            return await fetchAPI(endpoint);
-        } catch (error) {
-            console.log("Direct API failed, trying CORS proxy...");
-            try {
-                // Try with CORS proxy
-                return await fetchAPI(endpoint, true);
-            } catch (proxyError) {
-                console.error("Proxy also failed:", proxyError);
-                throw error; // Throw original error
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            
+            const data = await response.json();
+            
+            // Check for API-level errors
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            return data;
+        } catch (error) {
+            console.warn(`Direct fetch failed (${endpoint}), trying proxy...`, error);
+            return fetchViaProxy(endpoint);
         }
     }
 
-    // Core API fetch function
-    async function fetchAPI(endpoint, useProxy = false) {
-        const url = useProxy 
-            ? `https://cors-anywhere.herokuapp.com/${API_BASE_URL}/${endpoint}&token=${API_KEY}`
-            : `${API_BASE_URL}/${endpoint}&token=${API_KEY}`;
-
-        const response = await fetch(url, {
-            headers: useProxy ? {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Origin': window.location.origin
-            } : {}
-        });
-
-        if (!response.ok) {
-            throw new Error(`API request failed: ${response.status}`);
-        }
-
-        const data = await response.json();
+    // Proxy fetch function
+    async function fetchViaProxy(endpoint) {
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`${API_BASE_URL}/${endpoint}&token=${API_KEY}`)}`;
         
-        // Finnhub returns { error: "Message" } for invalid requests
-        if (data.error) {
-            throw new Error(data.error);
+        try {
+            const response = await fetch(proxyUrl);
+            
+            if (!response.ok) {
+                throw new Error(`Proxy error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return JSON.parse(data.contents);
+        } catch (error) {
+            console.error('Proxy fetch failed:', error);
+            throw error;
         }
-
-        return data;
     }
 
     // Chart Rendering
     async function renderStockChart(ticker) {
         try {
-            const data = await fetchWithFallback(
-                `stock/candle?symbol=${ticker}&resolution=${chartTimeframe}&count=30`
-            );
-
+            const data = await fetchWithFallback(`stock/candle?symbol=${ticker}&resolution=D&count=30`);
+            
             const ctx = document.getElementById('stockChart').getContext('2d');
             if (stockChart) stockChart.destroy();
-
+            
             // Create gradient
             const gradient = ctx.createLinearGradient(0, 0, 0, 400);
             gradient.addColorStop(0, 'rgba(0, 255, 252, 0.2)');
             gradient.addColorStop(1, 'rgba(0, 255, 252, 0)');
-
+            
             stockChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -161,14 +156,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         borderColor: 'var(--neon-blue)',
                         backgroundColor: gradient,
                         borderWidth: 2,
-                        pointRadius: 0,
                         tension: 0.1,
                         fill: true
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -181,47 +174,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } },
                         y: { 
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { callback: (value) => `$${value}` }
+                            ticks: { callback: value => `$${value}` }
                         }
                     }
                 }
             });
-
-            // Add timeframe controls
-            createChartControls();
+            
             document.getElementById('stockChartContainer').classList.remove('hidden');
         } catch (error) {
             console.error('Chart error:', error);
-        }
-    }
-
-    // Chart Timeframe Controls
-    function createChartControls() {
-        const container = document.getElementById('chartControls') || document.createElement('div');
-        container.id = 'chartControls';
-        container.className = 'chart-controls';
-        container.innerHTML = '';
-
-        const timeframes = [
-            { label: '1D', value: '1' },
-            { label: '1W', value: 'D' },
-            { label: '1M', value: 'W' },
-            { label: '1Y', value: 'M' }
-        ];
-
-        timeframes.forEach(tf => {
-            const btn = document.createElement('button');
-            btn.textContent = tf.label;
-            btn.className = chartTimeframe === tf.value ? 'active' : '';
-            btn.onclick = () => {
-                chartTimeframe = tf.value;
-                renderStockChart(currentTicker);
-            };
-            container.appendChild(btn);
-        });
-
-        if (!document.getElementById('chartControls')) {
-            document.getElementById('stockChartContainer').prepend(container);
         }
     }
 
@@ -231,15 +192,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
             const toDate = new Date().toISOString().split('T')[0];
             
-            const news = await fetchWithFallback(
-                `company-news?symbol=${ticker}&from=${fromDate}&to=${toDate}`
-            );
-
+            const news = await fetchWithFallback(`company-news?symbol=${ticker}&from=${fromDate}&to=${toDate}`);
+            
             const newsFeed = document.getElementById('newsFeed');
             newsFeed.innerHTML = '';
-
-            news.slice(0, 5).forEach(item => {
-                if (item.headline && item.url) {
+            
+            // Display up to 5 valid news items
+            news
+                .filter(item => item.headline && item.url)
+                .slice(0, 5)
+                .forEach(item => {
                     const newsItem = document.createElement('div');
                     newsItem.className = 'news-item';
                     newsItem.innerHTML = `
@@ -248,9 +210,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <a href="${item.url}" target="_blank">Read more →</a>
                     `;
                     newsFeed.appendChild(newsItem);
-                }
-            });
-
+                });
+            
             document.getElementById('newsContainer').classList.remove('hidden');
         } catch (error) {
             console.error('News fetch error:', error);
@@ -263,7 +224,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!recentTickers.includes(ticker)) {
             recentTickers.unshift(ticker);
-            if (recentTickers.length > 5) recentTickers.pop();
+            recentTickers = recentTickers.slice(0, 5); // Keep only 5 most recent
             localStorage.setItem('recentTickers', JSON.stringify(recentTickers));
             updateRecentTickersDisplay();
         }
@@ -272,13 +233,16 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateRecentTickersDisplay() {
         const recentTickers = JSON.parse(localStorage.getItem('recentTickers')) || [];
         recentTickersElement.innerHTML = '';
-
+        
         recentTickers.forEach(ticker => {
-            const element = document.createElement('div');
-            element.className = 'recent-ticker';
-            element.textContent = ticker;
-            element.onclick = () => fetchStockData(ticker);
-            recentTickersElement.appendChild(element);
+            const tickerElement = document.createElement('div');
+            tickerElement.className = 'recent-ticker';
+            tickerElement.textContent = ticker;
+            tickerElement.addEventListener('click', () => {
+                tickerInput.value = ticker;
+                fetchStockData();
+            });
+            recentTickersElement.appendChild(tickerElement);
         });
     }
 
@@ -290,12 +254,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const priceElement = document.getElementById('price');
         priceElement.textContent = `$${data.price.toFixed(2)}`;
         priceElement.className = 'price';
-
+        
         const changeElement = document.getElementById('change');
         const changePercentElement = document.getElementById('changePercent');
-
+        
         if (data.change >= 0) {
-            changeElement.textContent = `+$${data.change.toFixed(2)}`;
+            changeElement.textContent = `+$${Math.abs(data.change).toFixed(2)}`;
             changeElement.className = 'positive';
             changePercentElement.textContent = `+${data.changePercent.toFixed(2)}%`;
             changePercentElement.className = 'positive';
@@ -305,18 +269,22 @@ document.addEventListener('DOMContentLoaded', function() {
             changePercentElement.textContent = `${data.changePercent.toFixed(2)}%`;
             changePercentElement.className = 'negative';
         }
-
+        
         document.getElementById('prevClose').textContent = `$${data.prevClose.toFixed(2)}`;
         document.getElementById('open').textContent = `$${data.open.toFixed(2)}`;
-        document.getElementById('dayRange').textContent = 
-            `$${data.low.toFixed(2)} - $${data.high.toFixed(2)}`;
+        document.getElementById('dayRange').textContent = `$${data.low.toFixed(2)} - $${data.high.toFixed(2)}`;
         document.getElementById('marketCap').textContent = data.marketCap;
     }
 
     function showError(message) {
         errorElement.innerHTML = `
             <p>ERROR: ${message}</p>
-            <p>PLEASE VERIFY TICKER SYMBOL AND TRY AGAIN</p>
+            <p>Please try:</p>
+            <ul>
+                <li>Checking your internet connection</li>
+                <li>Verifying the stock symbol</li>
+                <li>Waiting a moment and trying again</li>
+            </ul>
         `;
         errorElement.classList.remove('hidden');
     }
