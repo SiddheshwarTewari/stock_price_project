@@ -3,283 +3,260 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Price Analytics</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --neon-blue: #0ff0fc;
-            --neon-pink: #ff2a6d;
-            --dark-bg: #0a0a12;
-            --card-bg: rgba(15, 15, 25, 0.8);
-            --text-primary: #e0e0e0;
+    <title>CYBERSTOCK TERMINAL</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="cyber-container">
+        <!-- Terminal Header -->
+        <header class="terminal-header">
+            <div class="corner corner-tl"></div>
+            <div class="corner corner-tr"></div>
+            <h1 class="glow-text">// CYBERSTOCK TERMINAL v2.5.1</h1>
+            <div class="terminal-info">
+                <span id="datetime" class="glow-text">{{ stats.last_update if stats else '' }}</span>
+                <span class="status-indicator active">SYSTEM: ONLINE</span>
+            </div>
+            <div class="corner corner-bl"></div>
+            <div class="corner corner-br"></div>
+        </header>
+
+        <!-- Main Dashboard -->
+        <main class="dashboard">
+            <!-- Search Panel -->
+            <section class="search-panel">
+                <div class="search-container">
+                    <input type="text" id="stock-search" class="cyber-input" 
+                           placeholder="ENTER STOCK TICKER..." value="{{ symbol }}" autocomplete="off">
+                    <div class="time-filters">
+                        <button class="time-filter {{ 'active' if period == '1d' }}" 
+                                onclick="window.location.href='/?symbol={{ symbol }}&period=1d'">24H</button>
+                        <button class="time-filter {{ 'active' if period == '1wk' }}" 
+                                onclick="window.location.href='/?symbol={{ symbol }}&period=1wk'">1W</button>
+                        <button class="time-filter {{ 'active' if period == '1mo' }}" 
+                                onclick="window.location.href='/?symbol={{ symbol }}&period=1mo'">1M</button>
+                        <button class="time-filter {{ 'active' if period == '1y' }}" 
+                                onclick="window.location.href='/?symbol={{ symbol }}&period=1y'">1Y</button>
+                    </div>
+                    <button id="search-btn" class="cyber-button" onclick="searchStock()">
+                        <i class="fas fa-terminal"></i> QUERY
+                    </button>
+                    <button id="random-btn" class="cyber-button" onclick="randomStock()">
+                        <i class="fas fa-random"></i> RANDOM
+                    </button>
+                </div>
+                <div class="popular-stocks">
+                    <span>POPULAR:</span>
+                    <a href="/?symbol=AAPL">AAPL</a>
+                    <a href="/?symbol=MSFT">MSFT</a>
+                    <a href="/?symbol=TSLA">TSLA</a>
+                    <a href="/?symbol=NVDA">NVDA</a>
+                    <a href="/?symbol=AMZN">AMZN</a>
+                </div>
+            </section>
+
+            <!-- Data Display -->
+            <section class="data-display">
+                <!-- Stock Overview -->
+                <div class="cyber-card">
+                    <div class="card-header">
+                        <h2 class="glow-text">STOCK OVERVIEW</h2>
+                        <div class="stock-ticker">{{ symbol }}</div>
+                    </div>
+                    <div class="card-body">
+                        {% if info %}
+                        <div class="stock-name">{{ info.get('longName', 'N/A') }}</div>
+                        <div class="stock-sector">{{ info.get('sector', 'N/A') }} | {{ info.get('industry', 'N/A') }}</div>
+                        {% endif %}
+                        
+                        <div class="data-grid">
+                            <div class="data-item">
+                                <span class="data-label">CURRENT PRICE</span>
+                                <span class="data-value">${{ stats.current if stats else '--.--' }}</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">52W HIGH</span>
+                                <span class="data-value">${{ stats.high_52w if stats else '--.--' }}</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">52W LOW</span>
+                                <span class="data-value">${{ stats.low_52w if stats else '--.--' }}</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">AVG VOLUME</span>
+                                <span class="data-value">{{ "{:,}".format(stats.avg_volume) if stats else '--.--' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Price Chart -->
+                <div class="cyber-card chart-container">
+                    <div class="card-header">
+                        <h2 class="glow-text">PRICE CHART</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if chart %}
+                        <img src="{{ chart }}" alt="Stock Chart" class="stock-chart">
+                        {% else %}
+                        <div class="chart-placeholder">
+                            <i class="fas fa-chart-line"></i>
+                            <p>NO CHART DATA AVAILABLE</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <!-- Additional Data -->
+            <section class="additional-data">
+                <!-- Recent Data -->
+                <div class="cyber-card">
+                    <div class="card-header">
+                        <h2 class="glow-text">RECENT DATA</h2>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>DATE</th>
+                                    <th>OPEN</th>
+                                    <th>HIGH</th>
+                                    <th>LOW</th>
+                                    <th>CLOSE</th>
+                                    <th>VOLUME</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for day in data %}
+                                <tr>
+                                    <td>{{ day.date }}</td>
+                                    <td>${{ day.open }}</td>
+                                    <td>${{ day.high }}</td>
+                                    <td>${{ day.low }}</td>
+                                    <td>${{ day.close }}</td>
+                                    <td>{{ "{:,}".format(day.volume) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6">NO DATA AVAILABLE</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Company Info -->
+                <div class="cyber-card">
+                    <div class="card-header">
+                        <h2 class="glow-text">CORPORATE PROFILE</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if info and info.get('longBusinessSummary') %}
+                        <p class="company-description">{{ info.longBusinessSummary }}</p>
+                        {% else %}
+                        <p class="no-data">No company description available</p>
+                        {% endif %}
+                        
+                        <div class="info-grid">
+                            {% if info %}
+                            <div class="info-item">
+                                <span class="info-label">MARKET CAP</span>
+                                <span class="info-value">
+                                    {% if info.get('marketCap') %}
+                                        ${{ "{:,.2f}".format(info.marketCap / 1000000000) }}B
+                                    {% else %}N/A{% endif %}
+                                </span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">PE RATIO</span>
+                                <span class="info-value">{{ info.get('trailingPE', 'N/A') }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">DIVIDEND YIELD</span>
+                                <span class="info-value">
+                                    {% if info.get('dividendYield') %}
+                                        {{ "%.2f"|format(info.dividendYield * 100) }}%
+                                    {% else %}N/A{% endif %}
+                                </span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">52W CHANGE</span>
+                                <span class="info-value {{ 'positive' if info.get('52WeekChange', 0) >= 0 else 'negative' }}">
+                                    {% if info.get('52WeekChange') %}
+                                        {{ "%.2f"|format(info.52WeekChange * 100) }}%
+                                    {% else %}N/A{% endif %}
+                                </span>
+                            </div>
+                            {% else %}
+                            <div class="no-data">No company data available</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Terminal Footer -->
+        <footer class="terminal-footer">
+            <div class="corner corner-tl"></div>
+            <div class="corner corner-tr"></div>
+            <div class="footer-content">
+                <span class="glow-text">CYBERSTOCK TERMINAL © 2077</span>
+                <span>// DATA SOURCE: YAHOO FINANCE</span>
+                <span id="api-status">API: OPERATIONAL</span>
+            </div>
+            <div class="corner corner-bl"></div>
+            <div class="corner corner-br"></div>
+        </footer>
+    </div>
+
+    <!-- Visual Effects -->
+    <div class="scanlines"></div>
+    <div class="noise"></div>
+
+    <!-- Scripts -->
+    <script>
+        function updateDateTime() {
+            const now = new Date();
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            };
+            document.getElementById('datetime').textContent = now.toLocaleDateString('en-US', options);
         }
         
-        body {
-            background-color: var(--dark-bg);
-            color: var(--text-primary);
-            font-family: 'Roboto', sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 1px solid var(--neon-blue);
-            padding-bottom: 20px;
-        }
-        
-        h1 {
-            font-family: 'Orbitron', sans-serif;
-            color: var(--neon-blue);
-            text-shadow: 0 0 10px var(--neon-blue);
-            letter-spacing: 2px;
-        }
-        
-        .search-box {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-        
-        input, button {
-            padding: 10px 15px;
-            border: none;
-            font-size: 16px;
-        }
-        
-        input {
-            width: 200px;
-            background-color: var(--card-bg);
-            color: var(--text-primary);
-            border: 1px solid var(--neon-blue);
-        }
-        
-        button {
-            background-color: var(--neon-blue);
-            color: var(--dark-bg);
-            cursor: pointer;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-        
-        button:hover {
-            background-color: var(--neon-pink);
-        }
-        
-        .error {
-            color: #ff3860;
-            text-align: center;
-            padding: 15px;
-            border: 1px solid #ff3860;
-            margin-bottom: 20px;
-        }
-        
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 20px;
-        }
-        
-        @media (min-width: 900px) {
-            .dashboard {
-                grid-template-columns: 2fr 1fr;
+        function searchStock() {
+            const symbol = document.getElementById('stock-search').value.trim();
+            if (symbol) {
+                window.location.href = `/?symbol=${symbol.toUpperCase()}`;
             }
         }
         
-        .card {
-            background-color: var(--card-bg);
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 15px rgba(0, 255, 252, 0.1);
+        function randomStock() {
+            const stocks = ['AAPL', 'MSFT', 'TSLA', 'NVDA', 'AMZN', 'GOOGL', 'META', 'AMD', 'INTC', 'BTC-USD'];
+            const randomStock = stocks[Math.floor(Math.random() * stocks.length)];
+            window.location.href = `/?symbol=${randomStock}`;
         }
         
-        .chart-container {
-            width: 100%;
-            margin-bottom: 20px;
-        }
+        // Initialize
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
         
-        .chart-container img {
-            width: 100%;
-            height: auto;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-        
-        .stat-item {
-            background-color: rgba(0, 0, 0, 0.3);
-            padding: 10px;
-            border-left: 3px solid var(--neon-blue);
-        }
-        
-        .stat-label {
-            font-size: 0.8rem;
-            color: #a0a0a0;
-            margin-bottom: 5px;
-        }
-        
-        .stat-value {
-            font-weight: bold;
-            font-size: 1.2rem;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid rgba(0, 255, 252, 0.1);
-        }
-        
-        th {
-            color: var(--neon-blue);
-        }
-        
-        .positive {
-            color: #00ff88;
-        }
-        
-        .negative {
-            color: #ff3860;
-        }
-        
-        footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid var(--neon-blue);
-            font-size: 0.8rem;
-            color: #a0a0a0;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>STOCK PRICE ANALYTICS</h1>
-            <p>Analyze daily stock price data from Alpha Vantage</p>
-        </header>
-        
-        <div class="search-box">
-            <form method="GET" action="/">
-                <input type="text" name="symbol" placeholder="Enter stock symbol (e.g. IBM)" value="{{ symbol }}" required>
-                <button type="submit">QUERY</button>
-            </form>
-        </div>
-        
-        {% if error %}
-        <div class="error">
-            <strong>ERROR:</strong> {{ error }}
-        </div>
-        {% endif %}
-        
-        <div class="dashboard">
-            <div class="card">
-                <h2>{{ symbol }} - Price Chart</h2>
-                {% if chart %}
-                <div class="chart-container">
-                    <img src="{{ chart }}" alt="{{ symbol }} Stock Price Chart">
-                </div>
-                {% else %}
-                <p>No chart data available</p>
-                {% endif %}
-                
-                <h2>Recent Data</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Open</th>
-                            <th>High</th>
-                            <th>Low</th>
-                            <th>Close</th>
-                            <th>Volume</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for day in data %}
-                        <tr>
-                            <td>{{ day.date }}</td>
-                            <td>${{ "%.2f"|format(day.open) }}</td>
-                            <td>${{ "%.2f"|format(day.high) }}</td>
-                            <td>${{ "%.2f"|format(day.low) }}</td>
-                            <td>${{ "%.2f"|format(day.close) }}</td>
-                            <td>{{ "{:,}".format(day.volume) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="6">No data available</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="card">
-                <h2>Statistics</h2>
-                {% if stats %}
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-label">Latest Price</div>
-                        <div class="stat-value">${{ "%.2f"|format(stats.latest_price) }}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Date</div>
-                        <div class="stat-value">{{ stats.latest_date }}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Min Price</div>
-                        <div class="stat-value">${{ "%.2f"|format(stats.min_price) }}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Max Price</div>
-                        <div class="stat-value">${{ "%.2f"|format(stats.max_price) }}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Avg Price</div>
-                        <div class="stat-value">${{ "%.2f"|format(stats.avg_price) }}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Total Volume</div>
-                        <div class="stat-value">{{ "{:,}".format(stats.total_volume) }}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Days Analyzed</div>
-                        <div class="stat-value">{{ stats.days_analyzed }}</div>
-                    </div>
-                </div>
-                {% else %}
-                <p>No statistics available</p>
-                {% endif %}
-                
-                <h2>Popular Stocks</h2>
-                <ul>
-                    <li><a href="/?symbol=AAPL">Apple (AAPL)</a></li>
-                    <li><a href="/?symbol=MSFT">Microsoft (MSFT)</a></li>
-                    <li><a href="/?symbol=GOOGL">Alphabet (GOOGL)</a></li>
-                    <li><a href="/?symbol=AMZN">Amazon (AMZN)</a></li>
-                    <li><a href="/?symbol=TSLA">Tesla (TSLA)</a></li>
-                </ul>
-            </div>
-        </div>
-        
-        <footer>
-            <p>Stock Price Analytics | Powered by Alpha Vantage API | Data delayed by 15 minutes</p>
-        </footer>
-    </div>
+        document.getElementById('stock-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchStock();
+            }
+        });
+    </script>
 </body>
 </html>

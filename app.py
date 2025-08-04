@@ -1,126 +1,142 @@
 import os
 from flask import Flask, render_template, request, jsonify
-import requests
+import yfinance as yf
 from datetime import datetime, timedelta
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from io import BytesIO
 import base64
+import pandas as pd
 
 app = Flask(__name__)
 
-# Hardcoded Alpha Vantage API Key
-ALPHA_VANTAGE_API_KEY = "RBXMFITJ8OMCM8HA"
+# Cyberpunk color scheme
+CYBERPUNK_COLORS = {
+    'neon_blue': '#0ff0fc',
+    'neon_pink': '#ff2a6d',
+    'neon_purple': '#d300c5',
+    'dark_bg': '#0a0a12',
+    'card_bg': 'rgba(15, 15, 25, 0.8)'
+}
 
-def get_stock_data(symbol, outputsize='compact'):
-    """Fetch daily time series data from Alpha Vantage"""
-    url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize={outputsize}&apikey={ALPHA_VANTAGE_API_KEY}"
-    response = requests.get(url)
-    data = response.json()
-    
-    if 'Note' in data:
-        raise Exception("API rate limit reached")
-    if 'Error Message' in data:
-        raise Exception(data['Error Message'])
-    
-    return data
+def get_stock_data(symbol, period='1y'):
+    """Fetch stock data using yfinance"""
+    try:
+        stock = yf.Ticker(symbol)
+        hist = stock.history(period=period)
+        
+        if hist.empty:
+            return None, "No data found for this symbol"
+            
+        # Convert to list of dicts
+        data = []
+        for date, row in hist.iterrows():
+            data.append({
+                'date': date.strftime('%Y-%m-%d'),
+                'open': round(row['Open'], 2),
+                'high': round(row['High'], 2),
+                'low': round(row['Low'], 2),
+                'close': round(row['Close'], 2),
+                'volume': int(row['Volume'])
+            })
+            
+        # Get additional info
+        info = stock.info
+        return {
+            'history': data,
+            'info': info,
+            'symbol': symbol.upper()
+        }, None
+    except Exception as e:
+        return None, str(e)
 
-def process_stock_data(raw_data):
-    """Process raw API data into a more usable format"""
-    time_series = raw_data.get('Time Series (Daily)', {})
-    processed_data = []
+def generate_chart(data, symbol):
+    """Generate cyberpunk-style price chart"""
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(12, 6), 
+                        facecolor=CYBERPUNK_COLORS['dark_bg'])
     
-    for date, values in time_series.items():
-        processed_data.append({
-            'date': date,
-            'open': float(values['1. open']),
-            'high': float(values['2. high']),
-            'low': float(values['3. low']),
-            'close': float(values['4. close']),
-            'volume': int(values['5. volume'])
-        })
+    dates = [d['date'] for d in data][::-1]
+    closes = [d['close'] for d in data][::-1]
     
-    # Sort by date (newest first)
-    processed_data.sort(key=lambda x: x['date'], reverse=True)
-    return processed_data
-
-def generate_chart(stock_data, symbol):
-    """Generate a price chart from the stock data"""
-    dates = [entry['date'] for entry in stock_data[:30]]  # Last 30 days
-    closes = [entry['close'] for entry in stock_data[:30]]
+    # Main price line
+    ax.plot(dates, closes, 
+           color=CYBERPUNK_COLORS['neon_blue'], 
+           linewidth=2,
+           marker='o',
+           markersize=3,
+           markerfacecolor=CYBERPUNK_COLORS['neon_pink'])
     
-    plt.figure(figsize=(10, 5))
-    plt.plot(dates[::-1], closes[::-1], marker='o', color='#0ff0fc', linewidth=2)
-    plt.title(f'{symbol} Stock Price (Last 30 Days)')
-    plt.xlabel('Date')
-    plt.ylabel('Price ($)')
-    plt.xticks(rotation=45)
-    plt.grid(True, linestyle='--', alpha=0.7)
+    # Grid and styling
+    ax.set_facecolor(CYBERPUNK_COLORS['dark_bg'])
+    ax.grid(True, linestyle='--', alpha=0.3, color=CYBERPUNK_COLORS['neon_blue'])
+    ax.set_title(f'{symbol} PRICE CHART', 
+                color=CYBERPUNK_COLORS['neon_blue'],
+                fontweight='bold')
+    ax.set_xlabel('DATE', color=CYBERPUNK_COLORS['neon_purple'])
+    ax.set_ylabel('PRICE (USD)', color=CYBERPUNK_COLORS['neon_purple'])
+    plt.xticks(rotation=45, color=CYBERPUNK_COLORS['neon_purple'])
+    plt.yticks(color=CYBERPUNK_COLORS['neon_purple'])
     plt.tight_layout()
     
-    # Save plot to a bytes buffer
-    buffer = BytesIO()
-    plt.savefig(buffer, format='png')
-    buffer.seek(0)
+    # Save to buffer
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=100, facecolor=CYBERPUNK_COLORS['dark_bg'])
     plt.close()
+    buf.seek(0)
     
-    # Convert to base64 for HTML embedding
-    image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-    return f"data:image/png;base64,{image_base64}"
+    return f"data:image/png;base64,{base64.b64encode(buf.read()).decode('utf-8')}"
 
-def calculate_statistics(stock_data):
-    """Calculate basic statistics from the stock data"""
-    if not stock_data:
+def calculate_stats(data):
+    """Calculate key statistics"""
+    if not data:
         return {}
     
-    closes = [entry['close'] for entry in stock_data]
-    volumes = [entry['volume'] for entry in stock_data]
+    closes = [d['close'] for d in data]
+    volumes = [d['volume'] for d in data]
     
     return {
-        'latest_price': stock_data[0]['close'],
-        'latest_date': stock_data[0]['date'],
-        'min_price': min(closes),
-        'max_price': max(closes),
-        'avg_price': sum(closes) / len(closes),
-        'total_volume': sum(volumes),
-        'days_analyzed': len(stock_data)
+        'current': closes[0],
+        'high_52w': max(closes),
+        'low_52w': min(closes),
+        'avg_volume': int(sum(volumes)/len(volumes)),
+        'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    symbol = request.args.get('symbol', 'IBM')  # Default to IBM
+    symbol = request.args.get('symbol', 'AAPL')
+    period = request.args.get('period', '1y')
     error = None
+    stock_data = None
     chart = None
     stats = None
-    processed_data = []
+    info = None
     
-    try:
-        if request.method == 'GET' and symbol:
-            raw_data = get_stock_data(symbol)
-            processed_data = process_stock_data(raw_data)
-            chart = generate_chart(processed_data, symbol)
-            stats = calculate_statistics(processed_data)
-    except Exception as e:
-        error = str(e)
+    if symbol:
+        stock_data, error = get_stock_data(symbol, period)
+        if stock_data:
+            chart = generate_chart(stock_data['history'][-30:], stock_data['symbol'])
+            stats = calculate_stats(stock_data['history'])
+            info = stock_data['info']
     
-    return render_template('index.html', 
+    return render_template('index.html',
                          symbol=symbol,
+                         period=period,
                          chart=chart,
                          stats=stats,
+                         info=info,
                          error=error,
-                         data=processed_data[:10])  # Show only last 10 days
+                         data=stock_data['history'][-10:] if stock_data else [],
+                         colors=CYBERPUNK_COLORS)
 
 @app.route('/api/stock/<symbol>')
-def stock_api(symbol):
-    try:
-        raw_data = get_stock_data(symbol)
-        processed_data = process_stock_data(raw_data)
-        return jsonify({
-            'symbol': symbol,
-            'data': processed_data[:30],  # Last 30 days
-            'stats': calculate_statistics(processed_data)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
+def api_stock(symbol):
+    stock_data, error = get_stock_data(symbol)
+    if error:
+        return jsonify({'error': error}), 400
+    return jsonify(stock_data)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
