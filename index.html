@@ -17,7 +17,7 @@
                 <span class="terminal-btn yellow"></span>
                 <span class="terminal-btn green"></span>
             </div>
-            <div class="terminal-title">NEONSTOCK v3.0</div>
+            <div class="terminal-title">NEONSTOCK v2.4.1</div>
         </div>
         <div class="terminal-body">
             <div class="scanlines"></div>
@@ -60,6 +60,10 @@
                             <h2>CHANGE %</h2>
                             <p id="changePercent">-</p>
                         </div>
+                        <div class="info-card">
+                            <h2>MARKET CAP</h2>
+                            <p id="marketCap">-</p>
+                        </div>
                     </div>
                     
                     <div class="additional-data">
@@ -68,11 +72,13 @@
                             <p>PREV CLOSE: <span id="prevClose">-</span></p>
                             <p>OPEN: <span id="open">-</span></p>
                             <p>DAY RANGE: <span id="dayRange">-</span></p>
+                            <p>52WK RANGE: <span id="yearRange">-</span></p>
                         </div>
                     </div>
                 </div>
                 
                 <div id="stockChartContainer" class="hidden">
+                    <h2>PRICE MOVEMENT (30 DAYS)</h2>
                     <canvas id="stockChart"></canvas>
                 </div>
                 
@@ -91,10 +97,6 @@
             <span class="blink">SYSTEM READY</span>
             <span id="datetime"></span>
         </div>
-    </div>
-    
-    <div class="theme-toggle">
-        <button id="themeBtn">TOGGLE DARK/LIGHT MODE</button>
     </div>
     
     <script src="script.js"></script>
