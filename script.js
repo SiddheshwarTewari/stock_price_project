@@ -111,9 +111,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Get canvas element and set dimensions
-            const ctx = document.getElementById('stockChart');
-            ctx.width = ctx.offsetWidth;
-            ctx.height = ctx.offsetHeight;
+            // ...existing code...
+            const ctx = document.getElementById('stockChart').getContext('2d');
+            // ...existing code...
 
             // Destroy previous chart if exists
             if (stockChart) stockChart.destroy();
