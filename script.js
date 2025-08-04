@@ -97,71 +97,75 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Stock Chart Rendering
     // In the renderStockChart function, replace with this updated version:
+    // Replace your current renderStockChart function with this:
     async function renderStockChart(ticker) {
         try {
-            console.log(`Fetching chart data for ${ticker}`); // Debug 1
-            
+            console.log(`Fetching chart data for ${ticker}`);
             const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&count=30&token=${FINNHUB_API_KEY}`;
-            console.log("API URL:", url); // Debug 2
             
             const response = await fetch(url);
-            console.log("Response status:", response.status); // Debug 3
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             
             const data = await response.json();
-            console.log("Chart data received:", data); // Debug 4
-            
+            console.log("Chart data received:", data);
+
             // Check if we have valid data
-            if (!data || data.s !== "ok" || !data.c || data.c.length === 0) {
-                console.error('No valid chart data:', {
-                    status: data.s,
-                    closingPrices: data.c ? data.c.length : 0,
-                    timestamps: data.t ? data.t.length : 0
-                });
-                throw new Error('Invalid chart data received');
+            if (data.s !== "ok" || !data.c || data.c.length === 0) {
+                throw new Error('No valid chart data received');
             }
 
             const ctx = document.getElementById('stockChart');
-            if (!ctx) {
-                throw new Error('Chart canvas element not found');
-            }
-            
-            console.log("Creating chart with:", {
-                dates: data.t.map(t => new Date(t * 1000)),
-                prices: data.c
-            }); // Debug 5
+            if (!ctx) throw new Error('Canvas element not found');
 
-            if (stockChart) {
-                stockChart.destroy();
-            }
+            // Destroy previous chart if exists
+            if (stockChart) stockChart.destroy();
 
-            stockChart = new Chart(ctx.getContext('2d'), {
+            // Create new chart with explicit dimensions
+            ctx.style.width = '100%';
+            ctx.style.height = '300px';
+            ctx.width = ctx.offsetWidth;
+            ctx.height = ctx.offsetHeight;
+
+            stockChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: data.t.map(t => new Date(t * 1000).toLocaleDateString()),
                     datasets: [{
                         label: 'Price',
                         data: data.c,
-                        borderColor: '#0ff0fc',
+                        borderColor: 'var(--neon-blue)',
                         backgroundColor: 'rgba(0, 255, 252, 0.1)',
                         borderWidth: 2,
-                        tension: 0.1
+                        tension: 0.1,
+                        fill: true
                     }]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: 'var(--text-color)' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { 
+                                color: 'var(--text-color)',
+                                callback: function(value) {
+                                    return '$' + value;
+                                }
+                            }
+                        }
                     }
                 }
             });
 
-            console.log("Chart created successfully"); // Debug 6
+            console.log("Chart created successfully");
             document.getElementById('stockChartContainer').classList.remove('hidden');
-            
         } catch (error) {
             console.error('Chart error:', error);
             document.getElementById('stockChartContainer').classList.add('hidden');
