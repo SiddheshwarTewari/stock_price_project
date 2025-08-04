@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const datetimeElement = document.getElementById('datetime');
     
     // API Configuration
-    const API_KEY = 'd2837khr01qr2iauetf0d2837khr01qr2iauetfg';
+    const API_KEY = 'd283nthr01qr2iauh510d283nthr01qr2iauh51g';
     const API_BASE_URL = 'https://finnhub.io/api/v1';
     
     // Chart instance
