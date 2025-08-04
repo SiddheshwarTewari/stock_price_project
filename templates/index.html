@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Price Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #0ff0fc;
+            --neon-pink: #ff2a6d;
+            --dark-bg: #0a0a12;
+            --card-bg: rgba(15, 15, 25, 0.8);
+            --text-primary: #e0e0e0;
+        }
+        
+        body {
+            background-color: var(--dark-bg);
+            color: var(--text-primary);
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--neon-blue);
+            padding-bottom: 20px;
+        }
+        
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--neon-blue);
+            text-shadow: 0 0 10px var(--neon-blue);
+            letter-spacing: 2px;
+        }
+        
+        .search-box {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        input, button {
+            padding: 10px 15px;
+            border: none;
+            font-size: 16px;
+        }
+        
+        input {
+            width: 200px;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--neon-blue);
+        }
+        
+        button {
+            background-color: var(--neon-blue);
+            color: var(--dark-bg);
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        button:hover {
+            background-color: var(--neon-pink);
+        }
+        
+        .error {
+            color: #ff3860;
+            text-align: center;
+            padding: 15px;
+            border: 1px solid #ff3860;
+            margin-bottom: 20px;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        @media (min-width: 900px) {
+            .dashboard {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0, 255, 252, 0.1);
+        }
+        
+        .chart-container {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        
+        .chart-container img {
+            width: 100%;
+            height: auto;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-item {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-left: 3px solid var(--neon-blue);
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: #a0a0a0;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(0, 255, 252, 0.1);
+        }
+        
+        th {
+            color: var(--neon-blue);
+        }
+        
+        .positive {
+            color: #00ff88;
+        }
+        
+        .negative {
+            color: #ff3860;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--neon-blue);
+            font-size: 0.8rem;
+            color: #a0a0a0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>STOCK PRICE ANALYTICS</h1>
+            <p>Analyze daily stock price data from Alpha Vantage</p>
+        </header>
+        
+        <div class="search-box">
+            <form method="GET" action="/">
+                <input type="text" name="symbol" placeholder="Enter stock symbol (e.g. IBM)" value="{{ symbol }}" required>
+                <button type="submit">QUERY</button>
+            </form>
+        </div>
+        
+        {% if error %}
+        <div class="error">
+            <strong>ERROR:</strong> {{ error }}
+        </div>
+        {% endif %}
+        
+        <div class="dashboard">
+            <div class="card">
+                <h2>{{ symbol }} - Price Chart</h2>
+                {% if chart %}
+                <div class="chart-container">
+                    <img src="{{ chart }}" alt="{{ symbol }} Stock Price Chart">
+                </div>
+                {% else %}
+                <p>No chart data available</p>
+                {% endif %}
+                
+                <h2>Recent Data</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Open</th>
+                            <th>High</th>
+                            <th>Low</th>
+                            <th>Close</th>
+                            <th>Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in data %}
+                        <tr>
+                            <td>{{ day.date }}</td>
+                            <td>${{ "%.2f"|format(day.open) }}</td>
+                            <td>${{ "%.2f"|format(day.high) }}</td>
+                            <td>${{ "%.2f"|format(day.low) }}</td>
+                            <td>${{ "%.2f"|format(day.close) }}</td>
+                            <td>{{ "{:,}".format(day.volume) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6">No data available</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="card">
+                <h2>Statistics</h2>
+                {% if stats %}
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Latest Price</div>
+                        <div class="stat-value">${{ "%.2f"|format(stats.latest_price) }}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Date</div>
+                        <div class="stat-value">{{ stats.latest_date }}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Min Price</div>
+                        <div class="stat-value">${{ "%.2f"|format(stats.min_price) }}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Max Price</div>
+                        <div class="stat-value">${{ "%.2f"|format(stats.max_price) }}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Avg Price</div>
+                        <div class="stat-value">${{ "%.2f"|format(stats.avg_price) }}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Total Volume</div>
+                        <div class="stat-value">{{ "{:,}".format(stats.total_volume) }}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Days Analyzed</div>
+                        <div class="stat-value">{{ stats.days_analyzed }}</div>
+                    </div>
+                </div>
+                {% else %}
+                <p>No statistics available</p>
+                {% endif %}
+                
+                <h2>Popular Stocks</h2>
+                <ul>
+                    <li><a href="/?symbol=AAPL">Apple (AAPL)</a></li>
+                    <li><a href="/?symbol=MSFT">Microsoft (MSFT)</a></li>
+                    <li><a href="/?symbol=GOOGL">Alphabet (GOOGL)</a></li>
+                    <li><a href="/?symbol=AMZN">Amazon (AMZN)</a></li>
+                    <li><a href="/?symbol=TSLA">Tesla (TSLA)</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Stock Price Analytics | Powered by Alpha Vantage API | Data delayed by 15 minutes</p>
+        </footer>
+    </div>
+</body>
+</html>
