@@ -41,7 +41,9 @@ function init() {
     
     // Event listeners
     searchBtn.addEventListener('click', () => {
+        console.log('Query button clicked'); // Add this line
         const ticker = stockInput.value.trim().toUpperCase();
+        console.log('Ticker:', ticker); // Add this line
         if (ticker) fetchStockData(ticker);
     });
     
@@ -151,26 +153,30 @@ function displaySuggestions(suggestions) {
     suggestionsContainer.style.display = 'block';
 }
 
-// Fetch stock data
 async function fetchStockData(ticker) {
     try {
+        console.log(`Fetching data for ${ticker}`); // Add this line
         apiStatusElement.textContent = 'API: FETCHING...';
         apiStatusElement.className = 'status-active';
         
         // Fetch quote data
         const quoteResponse = await axios.get(`/api/quote?symbol=${ticker}`);
+        console.log('Quote response:', quoteResponse); // Add this line
         const quoteData = quoteResponse.data;
         
         // Fetch company info
         const infoResponse = await axios.get(`/api/info?symbol=${ticker}`);
+        console.log('Info response:', infoResponse); // Add this line
         const infoData = infoResponse.data;
         
         // Fetch news
         const newsResponse = await axios.get(`/api/news?symbol=${ticker}`);
+        console.log('News response:', newsResponse); // Add this line
         const newsData = newsResponse.data;
         
         // Fetch historical data for chart
         const historicalResponse = await axios.get(`/api/historical?symbol=${ticker}&range=1d`);
+        console.log('Historical response:', historicalResponse); // Add this line
         const historicalData = historicalResponse.data;
         
         // Update UI with all data
