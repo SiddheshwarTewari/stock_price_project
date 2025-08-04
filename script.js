@@ -100,32 +100,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // Replace your current renderStockChart function with this:
     async function renderStockChart(ticker) {
         try {
-            console.log(`Fetching chart data for ${ticker}`);
+            // Fetch 30 days of price data
             const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&count=30&token=${FINNHUB_API_KEY}`;
-            
             const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
             const data = await response.json();
-            console.log("Chart data received:", data);
 
-            // Check if we have valid data
+            // Only proceed if we have valid data
             if (data.s !== "ok" || !data.c || data.c.length === 0) {
-                throw new Error('No valid chart data received');
+                throw new Error('No price data available');
             }
 
+            // Get canvas element and set dimensions
             const ctx = document.getElementById('stockChart');
-            if (!ctx) throw new Error('Canvas element not found');
+            ctx.width = ctx.offsetWidth;
+            ctx.height = ctx.offsetHeight;
 
             // Destroy previous chart if exists
             if (stockChart) stockChart.destroy();
 
-            // Create new chart with explicit dimensions
-            ctx.style.width = '100%';
-            ctx.style.height = '300px';
-            ctx.width = ctx.offsetWidth;
-            ctx.height = ctx.offsetHeight;
-
+            // Create simple line graph
             stockChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -133,30 +126,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     datasets: [{
                         label: 'Price',
                         data: data.c,
-                        borderColor: 'var(--neon-blue)',
-                        backgroundColor: 'rgba(0, 255, 252, 0.1)',
+                        borderColor: '#0ff0fc', // Neon blue
                         borderWidth: 2,
                         tension: 0.1,
-                        fill: true
+                        pointRadius: 0 // Remove data points for cleaner look
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false } // Hide legend
                     },
                     scales: {
-                        x: {
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { color: 'var(--text-color)' }
-                        },
+                        x: { display: false }, // Hide x-axis labels for simplicity
                         y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { 
-                                color: 'var(--text-color)',
+                            ticks: {
                                 callback: function(value) {
-                                    return '$' + value;
+                                    return '$' + value.toFixed(2); // Format as currency
                                 }
                             }
                         }
@@ -164,10 +151,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            console.log("Chart created successfully");
+            // Show the graph container
             document.getElementById('stockChartContainer').classList.remove('hidden');
+            
         } catch (error) {
-            console.error('Chart error:', error);
+            console.error('Failed to create graph:', error);
             document.getElementById('stockChartContainer').classList.add('hidden');
         }
     }
