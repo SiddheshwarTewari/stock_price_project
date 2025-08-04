@@ -97,41 +97,79 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Stock Chart Rendering
     // In the renderStockChart function, replace with this updated version:
+    // Chart instance
+    // let stockChart;
+
     async function renderStockChart(ticker) {
         try {
-            // TEST DATA - comment this out when API works
-            const testData = {
-                s: "ok",
-                c: [142.12, 141.34, 143.78, 144.56, 142.89, 145.22, 146.35, 147.01, 145.89, 146.45],
-                t: Array.from({length: 10}, (_,i) => Math.floor(Date.now()/1000) - (i * 86400))
-            };
-            
-            // Uncomment this when API works:
-            // const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&count=30&token=${FINNHUB_API_KEY}`;
-            // const testData = await fetch(url).then(r => r.json());
-            
-            if (testData.s !== "ok") throw new Error('No data');
-            
+            // Try real API first
+            let chartData;
+            try {
+                const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&count=30&token=d283nthr01qr2iauh510d283nthr01qr2iauh51g`;
+                const response = await fetch(url);
+                chartData = await response.json();
+                
+                if (chartData.s !== "ok") {
+                    throw new Error('API returned non-ok status');
+                }
+            } catch (apiError) {
+                console.warn("API failed, using test data:", apiError);
+                // Fallback to test data
+                chartData = {
+                    s: "ok",
+                    c: Array.from({length: 30}, (_,i) => 150 + Math.sin(i/3)*10 + Math.random()*5),
+                    t: Array.from({length: 30}, (_,i) => 
+                        Math.floor(Date.now()/1000) - (i * 86400))
+                };
+            }
+
+            // Get canvas and ensure proper dimensions
             const ctx = document.getElementById('stockChart');
+            ctx.width = ctx.offsetWidth;
+            ctx.height = ctx.offsetHeight;
+
+            // Clear previous chart
             if (stockChart) stockChart.destroy();
-            
+
+            // Create new chart
             stockChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: testData.t.map(t => new Date(t * 1000).toLocaleDateString()),
+                    labels: chartData.t.map(t => 
+                        new Date(t * 1000).toLocaleDateString('en-US', 
+                        { month: 'short', day: 'numeric' })),
                     datasets: [{
                         label: 'Price',
-                        data: testData.c,
+                        data: chartData.c,
                         borderColor: '#0ff0fc',
-                        borderWidth: 2
+                        backgroundColor: 'rgba(0, 255, 252, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        fill: true
                     }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { 
+                            grid: { display: false },
+                            ticks: { maxRotation: 0 }
+                        },
+                        y: {
+                            ticks: {
+                                callback: value => `$${value.toFixed(2)}`
+                            }
+                        }
+                    }
                 }
             });
-            
+
             document.getElementById('stockChartContainer').classList.remove('hidden');
             
         } catch (error) {
-            console.error("Graph error:", error);
+            console.error("Chart error:", error);
             document.getElementById('stockChartContainer').classList.add('hidden');
         }
     }
