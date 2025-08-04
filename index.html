@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeonStock // Market Data</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="terminal">
+        <div class="terminal-header">
+            <div class="terminal-buttons">
+                <span class="terminal-btn red"></span>
+                <span class="terminal-btn yellow"></span>
+                <span class="terminal-btn green"></span>
+            </div>
+            <div class="terminal-title">NEONSTOCK v2.4.1</div>
+        </div>
+        <div class="terminal-body">
+            <div class="scanlines"></div>
+            <div class="content">
+                <h1 class="glow">// STOCK DATA INTERFACE</h1>
+                <div class="input-container">
+                    <input type="text" id="tickerInput" placeholder="ENTER TICKER SYMBOL (e.g. AAPL)" autocomplete="off">
+                    <button id="searchBtn"><i class="fas fa-arrow-right"></i></button>
+                </div>
+                
+                <div id="loading" class="hidden">
+                    <div class="spinner"></div>
+                    <p>ACCESSING MARKET DATABASE...</p>
+                </div>
+                
+                <div id="error" class="hidden error-message">
+                    <p>ERROR: DATA RETRIEVAL FAILED</p>
+                    <p>PLEASE VERIFY TICKER SYMBOL AND TRY AGAIN</p>
+                </div>
+                
+                <div id="stockInfo" class="hidden">
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <h2>COMPANY</h2>
+                            <p id="companyName">-</p>
+                        </div>
+                        <div class="info-card">
+                            <h2>SYMBOL</h2>
+                            <p id="symbol">-</p>
+                        </div>
+                        <div class="info-card">
+                            <h2>PRICE</h2>
+                            <p id="price" class="price">-</p>
+                        </div>
+                        <div class="info-card">
+                            <h2>CHANGE</h2>
+                            <p id="change">-</p>
+                        </div>
+                        <div class="info-card">
+                            <h2>CHANGE %</h2>
+                            <p id="changePercent">-</p>
+                        </div>
+                        <div class="info-card">
+                            <h2>MARKET CAP</h2>
+                            <p id="marketCap">-</p>
+                        </div>
+                    </div>
+                    
+                    <div class="additional-data">
+                        <div class="data-column">
+                            <h3>TRADING DATA</h3>
+                            <p>PREV CLOSE: <span id="prevClose">-</span></p>
+                            <p>OPEN: <span id="open">-</span></p>
+                            <p>DAY RANGE: <span id="dayRange">-</span></p>
+                            <p>52WK RANGE: <span id="yearRange">-</span></p>
+                        </div>
+                        <div class="data-column">
+                            <h3>VOLUME DATA</h3>
+                            <p>VOLUME: <span id="volume">-</span></p>
+                            <p>AVG VOLUME: <span id="avgVolume">-</span></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="recent-searches">
+                    <h3>RECENT QUERIES</h3>
+                    <div id="recentTickers"></div>
+                </div>
+            </div>
+        </div>
+        <div class="terminal-footer">
+            <span class="blink">SYSTEM READY</span>
+            <span id="datetime"></span>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
