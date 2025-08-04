@@ -98,40 +98,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // Stock Chart Rendering
     // In the renderStockChart function, replace with this updated version:
     // Chart instance
-    // let stockChart;
-
     async function renderStockChart(ticker) {
         try {
-            // Try real API first
-            let chartData;
-            try {
-                const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&count=30&token=d283nthr01qr2iauh510d283nthr01qr2iauh51g`;
-                const response = await fetch(url);
-                chartData = await response.json();
-                
-                if (chartData.s !== "ok") {
-                    throw new Error('API returned non-ok status');
-                }
-            } catch (apiError) {
-                console.warn("API failed, using test data:", apiError);
-                // Fallback to test data
-                chartData = {
-                    s: "ok",
-                    c: Array.from({length: 30}, (_,i) => 150 + Math.sin(i/3)*10 + Math.random()*5),
-                    t: Array.from({length: 30}, (_,i) => 
-                        Math.floor(Date.now()/1000) - (i * 86400))
-                };
+            // Clear previous chart
+            if (stockChart) stockChart.destroy();
+
+            // Show loading state for chart
+            document.getElementById('stockChartContainer').classList.add('hidden');
+            const chartLoading = document.createElement('div');
+            chartLoading.className = 'loading-chart';
+            chartLoading.innerHTML = '<p>LOADING CHART DATA...</p>';
+            document.getElementById('stockChartContainer').appendChild(chartLoading);
+
+            // API URL with correct parameters
+            const url = `https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${Math.floor(Date.now() / 1000) - 2592000}&to=${Math.floor(Date.now() / 1000)}&token=${FINNHUB_API_KEY}`;
+            
+            const response = await fetch(url);
+            const chartData = await response.json();
+            
+            if (chartData.s !== "ok" || !chartData.c || chartData.c.length === 0) {
+                throw new Error('Invalid chart data received');
             }
+
+            // Remove loading element
+            document.getElementById('stockChartContainer').removeChild(chartLoading);
 
             // Get canvas and ensure proper dimensions
             const ctx = document.getElementById('stockChart');
             ctx.width = ctx.offsetWidth;
             ctx.height = ctx.offsetHeight;
 
-            // Clear previous chart
-            if (stockChart) stockChart.destroy();
-
-            // Create new chart
+            // Create new chart with real data
             stockChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -170,7 +167,18 @@ document.addEventListener('DOMContentLoaded', function() {
             
         } catch (error) {
             console.error("Chart error:", error);
-            document.getElementById('stockChartContainer').classList.add('hidden');
+            // Remove loading element if it exists
+            const chartLoading = document.querySelector('.loading-chart');
+            if (chartLoading) {
+                document.getElementById('stockChartContainer').removeChild(chartLoading);
+            }
+            
+            // Show error message instead of test data
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'error-message';
+            errorMsg.innerHTML = '<p>CHART DATA UNAVAILABLE</p>';
+            document.getElementById('stockChartContainer').appendChild(errorMsg);
+            document.getElementById('stockChartContainer').classList.remove('hidden');
         }
     }
     
