@@ -211,19 +211,38 @@ async function fetchStockData(ticker) {
 
 // Update Stock UI
 function updateStockUI(quoteData, companyData) {
+  // Defensive: If either is missing or empty, show error
+  if (!companyData || Object.keys(companyData).length === 0 || !quoteData || Object.keys(quoteData).length === 0) {
+    stockNameElement.textContent = 'Not Found';
+    stockTickerElement.textContent = 'N/A';
+    stockPriceElement.textContent = '--.--';
+    stockChangeElement.textContent = '--.--';
+    stockChangePercentElement.textContent = '--.--';
+    marketCapElement.textContent = 'N/A';
+    peRatioElement.textContent = 'N/A';
+    high52Element.textContent = 'N/A';
+    low52Element.textContent = 'N/A';
+    volumeElement.textContent = 'N/A';
+    companyDescription.textContent = 'No company information found for this ticker.';
+    sectorElement.textContent = 'N/A';
+    industryElement.textContent = 'N/A';
+    dividendYieldElement.textContent = 'N/A';
+    return;
+  }
+
   // Basic Info
   stockNameElement.textContent = companyData.name || 'N/A';
   stockTickerElement.textContent = companyData.symbol || 'N/A';
-  
+
   // Price Data
-  const price = quoteData.price || 0;
-  const change = quoteData.change || 0;
-  const changePercent = quoteData.changePercent || 0;
-  
-  stockPriceElement.textContent = price.toFixed(2);
-  stockChangeElement.textContent = change.toFixed(2);
-  stockChangePercentElement.textContent = changePercent.toFixed(2) + '%';
-  
+  const price = typeof quoteData.price === 'number' && !isNaN(quoteData.price) ? quoteData.price : null;
+  const change = typeof quoteData.change === 'number' && !isNaN(quoteData.change) ? quoteData.change : null;
+  const changePercent = typeof quoteData.changePercent === 'number' && !isNaN(quoteData.changePercent) ? quoteData.changePercent : null;
+
+  stockPriceElement.textContent = price !== null ? price.toFixed(2) : 'N/A';
+  stockChangeElement.textContent = change !== null ? change.toFixed(2) : 'N/A';
+  stockChangePercentElement.textContent = changePercent !== null ? changePercent.toFixed(2) + '%' : 'N/A';
+
   // Set color based on change
   if (change > 0) {
     stockChangeElement.className = 'data-value positive';
@@ -235,19 +254,23 @@ function updateStockUI(quoteData, companyData) {
     stockChangeElement.className = 'data-value';
     stockChangePercentElement.className = 'data-value';
   }
-  
+
   // Additional Info
-  marketCapElement.textContent = formatMarketCap(companyData.marketCap);
-  peRatioElement.textContent = companyData.peRatio ? companyData.peRatio.toFixed(2) : 'N/A';
-  high52Element.textContent = companyData.high52 ? parseFloat(companyData.high52).toFixed(2) : 'N/A';
-  low52Element.textContent = companyData.low52 ? parseFloat(companyData.low52).toFixed(2) : 'N/A';
-  volumeElement.textContent = quoteData.volume ? formatNumber(quoteData.volume) : 'N/A';
-  
+  marketCapElement.textContent = companyData.marketCap ? formatMarketCap(companyData.marketCap) : 'N/A';
+  peRatioElement.textContent = companyData.peRatio && !isNaN(companyData.peRatio) ? Number(companyData.peRatio).toFixed(2) : 'N/A';
+  high52Element.textContent = companyData.high52 && !isNaN(companyData.high52) ? parseFloat(companyData.high52).toFixed(2) : 'N/A';
+  low52Element.textContent = companyData.low52 && !isNaN(companyData.low52) ? parseFloat(companyData.low52).toFixed(2) : 'N/A';
+  volumeElement.textContent = quoteData.volume && !isNaN(quoteData.volume) ? formatNumber(quoteData.volume) : 'N/A';
+
   // Company Info
   companyDescription.textContent = companyData.description || 'No description available.';
   sectorElement.textContent = companyData.sector || 'N/A';
   industryElement.textContent = companyData.industry || 'N/A';
-  dividendYieldElement.textContent = companyData.dividendYield ? (parseFloat(companyData.dividendYield) * 100 + '%') : 'N/A';
+  dividendYieldElement.textContent = (
+    companyData.dividendYield && !isNaN(companyData.dividendYield)
+      ? (parseFloat(companyData.dividendYield) * 100).toFixed(2) + '%'
+      : 'N/A'
+  );
 }
 
 // Format Market Cap
