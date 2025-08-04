@@ -96,31 +96,53 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Stock Chart Rendering
+    // In the renderStockChart function, replace with this updated version:
     async function renderStockChart(ticker) {
         try {
-            const data = await fetchFinnhubData(`stock/candle?symbol=${ticker}&resolution=D&count=30`);
+            const data = await fetchFinnhubData(`stock/candle?symbol=${ticker}&resolution=D&count=30&token=${FINNHUB_API_KEY}`);
             
+            // Check if we have valid data
+            if (!data || !data.c || data.c.length === 0) {
+                console.error('No valid chart data received');
+                return;
+            }
+
             const ctx = document.getElementById('stockChart').getContext('2d');
-            if (stockChart) stockChart.destroy();
             
+            // Destroy previous chart if it exists
+            if (stockChart) {
+                stockChart.destroy();
+            }
+
+            // Create new chart
             stockChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: data.t.map(t => new Date(t * 1000).toLocaleDateString()),
+                    labels: data.t.map(timestamp => {
+                        const date = new Date(timestamp * 1000);
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    }),
                     datasets: [{
                         label: 'Price',
                         data: data.c,
                         borderColor: 'var(--neon-blue)',
                         backgroundColor: 'rgba(0, 255, 252, 0.1)',
-                        tension: 0.4,
-                        fill: true
+                        borderWidth: 2,
+                        tension: 0.1,
+                        fill: true,
+                        pointRadius: 0 // Remove points for cleaner look
                     }]
                 },
                 options: {
                     responsive: true,
-                    plugins: { 
-                        legend: { display: false },
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
                         tooltip: {
+                            mode: 'index',
+                            intersect: false,
                             callbacks: {
                                 label: function(context) {
                                     return `$${context.parsed.y.toFixed(2)}`;
@@ -129,24 +151,45 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     },
                     scales: {
-                        x: { 
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { color: 'var(--text-color)' }
-                        },
-                        y: { 
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { 
+                        x: {
+                            grid: {
+                                display: false,
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
                                 color: 'var(--text-color)',
-                                callback: value => `$${value}`
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 10
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'var(--text-color)',
+                                callback: function(value) {
+                                    return `$${value}`;
+                                }
                             }
                         }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
                     }
                 }
             });
-            
+
+            // Make sure to show the container
             document.getElementById('stockChartContainer').classList.remove('hidden');
+            
         } catch (error) {
             console.error('Failed to load chart:', error);
+            // Hide chart container if there's an error
+            document.getElementById('stockChartContainer').classList.add('hidden');
         }
     }
     
