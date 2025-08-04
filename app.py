@@ -1,3 +1,6 @@
+# Add this at the top of app.py
+import warnings
+warnings.filterwarnings("ignore", message="The 'unit' keyword in Timestamp construction is deprecated")
 import os
 from flask import Flask, render_template, request, jsonify
 import yfinance as yf
