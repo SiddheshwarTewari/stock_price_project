@@ -38,8 +38,11 @@ document.addEventListener('DOMContentLoaded', function() {
         stockInfoElement.classList.add('hidden');
         
         try {
-            // Using Yahoo Finance without API (web scraping approach)
-            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`);
+            // Using a CORS proxy to access Yahoo Finance
+            const proxyUrl = 'https://api.allorigins.win/get?url=';
+            const yahooUrl = encodeURIComponent(`https://finance.yahoo.com/quote/${ticker}`);
+            
+            const response = await fetch(`${proxyUrl}${yahooUrl}`);
             
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -47,41 +50,53 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             
-            // Check if data is valid
-            if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
-                throw new Error('No data available for this ticker');
+            // Parse the HTML content from the response
+            const htmlContent = data.contents;
+            
+            if (!htmlContent || htmlContent.includes('Symbol Lookup from Yahoo Finance')) {
+                throw new Error('Ticker not found');
             }
             
-            const result = data.chart.result[0];
-            const meta = result.meta;
-            
-            // Fetch additional data from Yahoo Finance summary page
-            const summaryResponse = await fetch(`https://finance.yahoo.com/quote/${ticker}`);
-            const summaryHtml = await summaryResponse.text();
-            
-            // Parse additional data from HTML
+            // Create a DOM parser to extract data from HTML
             const parser = new DOMParser();
-            const doc = parser.parseFromString(summaryHtml, 'text/html');
+            const doc = parser.parseFromString(htmlContent, 'text/html');
             
             // Extract company name
             const companyName = doc.querySelector('h1')?.textContent?.replace(` (${ticker})`, '') || ticker;
             
+            // Extract current price
+            const priceElement = doc.querySelector('[data-field="regularMarketPrice"]');
+            const price = priceElement ? parseFloat(priceElement.getAttribute('value')) : null;
+            
+            // Extract previous close
+            const prevCloseElement = doc.querySelector('[data-test="PREV_CLOSE-value"]');
+            const prevClose = prevCloseElement?.textContent || '-';
+            
             // Extract other data points
-            const prevClose = extractValue(doc, 'Previous Close');
-            const open = extractValue(doc, 'Open');
-            const dayRange = extractValue(doc, 'Day\\u0027s Range');
-            const yearRange = extractValue(doc, '52 Week Range');
-            const volume = extractValue(doc, 'Volume');
-            const avgVolume = extractValue(doc, 'Avg. Volume');
-            const marketCap = extractValue(doc, 'Market Cap');
+            const open = extractValueFromTable(doc, 'Open');
+            const dayRange = extractValueFromTable(doc, 'Day\'s Range');
+            const yearRange = extractValueFromTable(doc, '52 Week Range');
+            const volume = extractValueFromTable(doc, 'Volume');
+            const avgVolume = extractValueFromTable(doc, 'Avg. Volume');
+            const marketCap = extractValueFromTable(doc, 'Market Cap');
+            
+            // Calculate change and change percentage
+            let change = '-';
+            let changePercent = '-';
+            
+            if (price && prevClose !== '-' && !isNaN(parseFloat(prevClose.replace(/[^0-9.-]/g, '')))) {
+                const prevCloseValue = parseFloat(prevClose.replace(/[^0-9.-]/g, ''));
+                change = price - prevCloseValue;
+                changePercent = (change / prevCloseValue) * 100;
+            }
             
             // Update the UI with the fetched data
             updateStockInfo({
                 ticker,
                 companyName,
-                price: meta.regularMarketPrice,
-                change: meta.regularMarketPrice - meta.chartPreviousClose,
-                changePercent: ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100,
+                price: price || '-',
+                change,
+                changePercent,
                 prevClose,
                 open,
                 dayRange,
@@ -113,13 +128,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Helper function to extract value from Yahoo Finance summary page
-    function extractValue(doc, label) {
+    // Helper function to extract value from Yahoo Finance summary table
+    function extractValueFromTable(doc, label) {
         try {
-            const tdElements = Array.from(doc.querySelectorAll('td'));
-            const labelElement = tdElements.find(el => el.textContent.trim() === label);
-            if (labelElement && labelElement.nextElementSibling) {
-                return labelElement.nextElementSibling.textContent.trim();
+            // Find all table rows
+            const rows = Array.from(doc.querySelectorAll('tr'));
+            
+            // Find the row with the matching label
+            const row = rows.find(r => {
+                const th = r.querySelector('th');
+                return th && th.textContent.trim() === label;
+            });
+            
+            if (row) {
+                const td = row.querySelector('td');
+                return td ? td.textContent.trim() : '-';
             }
             return '-';
         } catch (e) {
@@ -134,28 +157,32 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('symbol').textContent = data.ticker;
         
         const priceElement = document.getElementById('price');
-        priceElement.textContent = formatCurrency(data.price);
+        priceElement.textContent = data.price === '-' ? '-' : formatCurrency(data.price);
         priceElement.className = 'price';
         
         const changeElement = document.getElementById('change');
         const changePercentElement = document.getElementById('changePercent');
         
-        if (data.change >= 0) {
-            changeElement.textContent = `+${formatCurrency(data.change)}`;
-            changeElement.classList.add('positive');
-            changeElement.classList.remove('negative');
-            
-            changePercentElement.textContent = `+${data.changePercent.toFixed(2)}%`;
-            changePercentElement.classList.add('positive');
-            changePercentElement.classList.remove('negative');
+        if (typeof data.change === 'number') {
+            if (data.change >= 0) {
+                changeElement.textContent = `+${formatCurrency(data.change)}`;
+                changeElement.className = 'positive';
+                
+                changePercentElement.textContent = `+${data.changePercent.toFixed(2)}%`;
+                changePercentElement.className = 'positive';
+            } else {
+                changeElement.textContent = formatCurrency(data.change);
+                changeElement.className = 'negative';
+                
+                changePercentElement.textContent = `${data.changePercent.toFixed(2)}%`;
+                changePercentElement.className = 'negative';
+            }
         } else {
-            changeElement.textContent = formatCurrency(data.change);
-            changeElement.classList.add('negative');
-            changeElement.classList.remove('positive');
+            changeElement.textContent = '-';
+            changeElement.className = '';
             
-            changePercentElement.textContent = `${data.changePercent.toFixed(2)}%`;
-            changePercentElement.classList.add('negative');
-            changePercentElement.classList.remove('positive');
+            changePercentElement.textContent = '-';
+            changePercentElement.className = '';
         }
         
         document.getElementById('prevClose').textContent = data.prevClose;
