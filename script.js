@@ -38,11 +38,32 @@ document.addEventListener('DOMContentLoaded', function() {
         stockInfoElement.classList.add('hidden');
         
         try {
-            // Using a CORS proxy to access Yahoo Finance
-            const proxyUrl = 'https://api.allorigins.win/get?url=';
-            const yahooUrl = encodeURIComponent(`https://finance.yahoo.com/quote/${ticker}`);
+            // Using Yahoo Finance's API directly with JSONP approach
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
             
-            const response = await fetch(`${proxyUrl}${yahooUrl}`);
+            // We'll use a CORS proxy as a fallback
+            const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+            
+            let response;
+            
+            // First try direct API call
+            try {
+                response = await fetch(url, {
+                    headers: {
+                        'Origin': window.location.origin
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Direct API failed');
+            } catch (e) {
+                // If direct API fails, try with CORS proxy
+                console.log('Trying with CORS proxy');
+                response = await fetch(proxyUrl + url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+            }
             
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -50,60 +71,43 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             
-            // Parse the HTML content from the response
-            const htmlContent = data.contents;
-            
-            if (!htmlContent || htmlContent.includes('Symbol Lookup from Yahoo Finance')) {
-                throw new Error('Ticker not found');
+            // Check if data is valid
+            if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
+                throw new Error('No data available for this ticker');
             }
             
-            // Create a DOM parser to extract data from HTML
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(htmlContent, 'text/html');
+            const result = data.chart.result[0];
+            const meta = result.meta;
             
-            // Extract company name
-            const companyName = doc.querySelector('h1')?.textContent?.replace(` (${ticker})`, '') || ticker;
+            // For additional data, we'll use a different endpoint
+            const summaryUrl = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`;
+            let summaryResponse = await fetch(proxyUrl + summaryUrl, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
             
-            // Extract current price
-            const priceElement = doc.querySelector('[data-field="regularMarketPrice"]');
-            const price = priceElement ? parseFloat(priceElement.getAttribute('value')) : null;
-            
-            // Extract previous close
-            const prevCloseElement = doc.querySelector('[data-test="PREV_CLOSE-value"]');
-            const prevClose = prevCloseElement?.textContent || '-';
-            
-            // Extract other data points
-            const open = extractValueFromTable(doc, 'Open');
-            const dayRange = extractValueFromTable(doc, 'Day\'s Range');
-            const yearRange = extractValueFromTable(doc, '52 Week Range');
-            const volume = extractValueFromTable(doc, 'Volume');
-            const avgVolume = extractValueFromTable(doc, 'Avg. Volume');
-            const marketCap = extractValueFromTable(doc, 'Market Cap');
-            
-            // Calculate change and change percentage
-            let change = '-';
-            let changePercent = '-';
-            
-            if (price && prevClose !== '-' && !isNaN(parseFloat(prevClose.replace(/[^0-9.-]/g, '')))) {
-                const prevCloseValue = parseFloat(prevClose.replace(/[^0-9.-]/g, ''));
-                change = price - prevCloseValue;
-                changePercent = (change / prevCloseValue) * 100;
+            if (!summaryResponse.ok) {
+                throw new Error('Could not fetch additional data');
             }
+            
+            const summaryData = await summaryResponse.json();
+            const quoteSummary = summaryData.quoteSummary.result[0].price;
             
             // Update the UI with the fetched data
             updateStockInfo({
                 ticker,
-                companyName,
-                price: price || '-',
-                change,
-                changePercent,
-                prevClose,
-                open,
-                dayRange,
-                yearRange,
-                volume,
-                avgVolume,
-                marketCap
+                companyName: quoteSummary.longName || ticker,
+                price: meta.regularMarketPrice,
+                change: meta.regularMarketPrice - meta.chartPreviousClose,
+                changePercent: ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100,
+                prevClose: meta.chartPreviousClose.toFixed(2),
+                open: quoteSummary.regularMarketOpen?.fmt || '-',
+                dayRange: `${quoteSummary.regularMarketDayLow?.fmt || '-'} - ${quoteSummary.regularMarketDayHigh?.fmt || '-'}`,
+                yearRange: quoteSummary.fiftyTwoWeekRange?.fmt || '-',
+                volume: quoteSummary.regularMarketVolume?.fmt || '-',
+                avgVolume: quoteSummary.averageDailyVolume3Month?.fmt || '-',
+                marketCap: quoteSummary.marketCap?.fmt || '-'
             });
             
             // Add to recent tickers if not already there
@@ -128,64 +132,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Helper function to extract value from Yahoo Finance summary table
-    function extractValueFromTable(doc, label) {
-        try {
-            // Find all table rows
-            const rows = Array.from(doc.querySelectorAll('tr'));
-            
-            // Find the row with the matching label
-            const row = rows.find(r => {
-                const th = r.querySelector('th');
-                return th && th.textContent.trim() === label;
-            });
-            
-            if (row) {
-                const td = row.querySelector('td');
-                return td ? td.textContent.trim() : '-';
-            }
-            return '-';
-        } catch (e) {
-            console.error(`Error extracting ${label}:`, e);
-            return '-';
-        }
-    }
-    
     // Function to update the stock info display
     function updateStockInfo(data) {
         document.getElementById('companyName').textContent = data.companyName;
         document.getElementById('symbol').textContent = data.ticker;
         
         const priceElement = document.getElementById('price');
-        priceElement.textContent = data.price === '-' ? '-' : formatCurrency(data.price);
+        priceElement.textContent = `$${data.price.toFixed(2)}`;
         priceElement.className = 'price';
         
         const changeElement = document.getElementById('change');
         const changePercentElement = document.getElementById('changePercent');
         
-        if (typeof data.change === 'number') {
-            if (data.change >= 0) {
-                changeElement.textContent = `+${formatCurrency(data.change)}`;
-                changeElement.className = 'positive';
-                
-                changePercentElement.textContent = `+${data.changePercent.toFixed(2)}%`;
-                changePercentElement.className = 'positive';
-            } else {
-                changeElement.textContent = formatCurrency(data.change);
-                changeElement.className = 'negative';
-                
-                changePercentElement.textContent = `${data.changePercent.toFixed(2)}%`;
-                changePercentElement.className = 'negative';
-            }
-        } else {
-            changeElement.textContent = '-';
-            changeElement.className = '';
+        if (data.change >= 0) {
+            changeElement.textContent = `+$${Math.abs(data.change).toFixed(2)}`;
+            changeElement.className = 'positive';
             
-            changePercentElement.textContent = '-';
-            changePercentElement.className = '';
+            changePercentElement.textContent = `+${data.changePercent.toFixed(2)}%`;
+            changePercentElement.className = 'positive';
+        } else {
+            changeElement.textContent = `-$${Math.abs(data.change).toFixed(2)}`;
+            changeElement.className = 'negative';
+            
+            changePercentElement.textContent = `${data.changePercent.toFixed(2)}%`;
+            changePercentElement.className = 'negative';
         }
         
-        document.getElementById('prevClose').textContent = data.prevClose;
+        document.getElementById('prevClose').textContent = `$${data.prevClose}`;
         document.getElementById('open').textContent = data.open;
         document.getElementById('dayRange').textContent = data.dayRange;
         document.getElementById('yearRange').textContent = data.yearRange;
@@ -230,17 +203,6 @@ document.addEventListener('DOMContentLoaded', function() {
             hour12: false
         });
         datetimeElement.textContent = `${date} ${time}`;
-    }
-    
-    // Helper function to format currency
-    function formatCurrency(value) {
-        if (typeof value !== 'number') return value;
-        return value.toLocaleString('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
     }
     
     // Initialize with a popular stock
