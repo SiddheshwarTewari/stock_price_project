@@ -11,27 +11,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Finnhub API Key
     const FINNHUB_API_KEY = 'd2837khr01qr2iauetf0d2837khr01qr2iauetfg';
     
-    // Chart instance
+    // Chart instances
     let stockChart;
-    
-    // Load recent tickers and watchlist from localStorage
-    let recentTickers = JSON.parse(localStorage.getItem('recentTickers')) || [];
-    updateRecentTickersDisplay();
-    updateWatchlist();
+    let chartTimeframe = 'D'; // Default to daily
     
     // Initialize
     updateDateTime();
     setInterval(updateDateTime, 1000);
     tickerInput.value = 'AAPL';
     fetchStockData();
-    
+
     // Event Listeners
     searchBtn.addEventListener('click', fetchStockData);
     tickerInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') fetchStockData();
     });
-    
-    document.getElementById('addToWatchlist').addEventListener('click', addCurrentToWatchlist);
     document.getElementById('themeBtn').addEventListener('click', toggleTheme);
 
     // Main Stock Data Fetch Function
@@ -68,23 +62,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 open: quoteData.o || '-',
                 high: quoteData.h || '-',
                 low: quoteData.l || '-',
-                marketCap: profileData.marketCapitalization ? formatMarketCap(profileData.marketCapitalization) : '-',
-                currency: profileData.currency || 'USD'
+                marketCap: profileData.marketCapitalization ? formatMarketCap(profileData.marketCapitalization) : '-'
             });
             
-            // Add to recent tickers
-            updateRecentTickers(ticker);
+            // Fetch and render chart
+            await renderStockChart(ticker);
             
-            // Fetch and render additional data
-            await Promise.all([
-                renderStockChart(ticker),
-                fetchNews(ticker)
-            ]);
+            // Fetch news
+            await fetchNews(ticker);
+            
+            // Update recent tickers
+            updateRecentTickers(ticker);
             
             // Show all sections
             loadingElement.classList.add('hidden');
             stockInfoElement.classList.remove('hidden');
-            document.getElementById('watchlistContainer').classList.remove('hidden');
             
         } catch (error) {
             console.error('Error:', error);
@@ -101,43 +93,138 @@ document.addEventListener('DOMContentLoaded', function() {
         return await response.json();
     }
     
-    // Stock Chart Rendering
+    // Enhanced Chart Rendering
     async function renderStockChart(ticker) {
         try {
-            const data = await fetchFinnhubData(`stock/candle?symbol=${ticker}&resolution=D&count=30`);
+            // Fetch chart data based on current timeframe
+            const data = await fetchFinnhubData(`stock/candle?symbol=${ticker}&resolution=${chartTimeframe}&count=100`);
             
             const ctx = document.getElementById('stockChart').getContext('2d');
             if (stockChart) stockChart.destroy();
             
+            // Create gradient for chart
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(0, 255, 252, 0.2)');
+            gradient.addColorStop(1, 'rgba(0, 255, 252, 0)');
+            
             stockChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: data.t.map(t => new Date(t * 1000).toLocaleDateString()),
+                    labels: data.t.map(t => formatChartDate(t, chartTimeframe)),
                     datasets: [{
                         label: 'Price',
                         data: data.c,
                         borderColor: 'var(--neon-blue)',
-                        backgroundColor: 'rgba(0, 255, 252, 0.1)',
-                        tension: 0.4,
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.1,
                         fill: true
                     }]
                 },
                 options: {
                     responsive: true,
-                    plugins: { legend: { display: false } },
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `Price: $${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
                     scales: {
-                        x: { grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                        x: {
+                            grid: { 
+                                color: 'rgba(255, 255, 255, 0.1)',
+                                display: chartTimeframe !== '1' // Hide grid for 1-minute charts
+                            },
+                            ticks: {
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 10
+                            }
+                        },
                         y: { 
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { callback: value => `$${value}` }
+                            ticks: { 
+                                callback: value => `$${value}`,
+                                padding: 10
+                            },
+                            position: 'right'
                         }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
                     }
                 }
             });
             
+            // Add timeframe buttons
+            createChartTimeframeButtons(ticker);
+            
             document.getElementById('stockChartContainer').classList.remove('hidden');
         } catch (error) {
             console.error('Failed to load chart:', error);
+        }
+    }
+    
+    // Create interactive timeframe buttons
+    function createChartTimeframeButtons(ticker) {
+        const container = document.getElementById('chartTimeframeControls') || 
+                         document.createElement('div');
+        container.id = 'chartTimeframeControls';
+        container.className = 'chart-timeframe-controls';
+        container.innerHTML = '';
+        
+        const timeframes = [
+            { label: '1D', value: '1', minutes: 1 },
+            { label: '5D', value: '5', minutes: 5 },
+            { label: '1M', value: '60', minutes: 60 },
+            { label: '1W', value: 'D', days: 1 },
+            { label: '1M', value: 'W', weeks: 1 },
+            { label: '1Y', value: 'M', months: 1 }
+        ];
+        
+        timeframes.forEach(tf => {
+            const btn = document.createElement('button');
+            btn.textContent = tf.label;
+            btn.className = chartTimeframe === tf.value ? 'active' : '';
+            btn.addEventListener('click', () => {
+                chartTimeframe = tf.value;
+                renderStockChart(ticker);
+            });
+            container.appendChild(btn);
+        });
+        
+        if (!document.getElementById('chartTimeframeControls')) {
+            document.getElementById('stockChartContainer').prepend(container);
+        }
+    }
+    
+    // Format date based on timeframe
+    function formatChartDate(timestamp, timeframe) {
+        const date = new Date(timestamp * 1000);
+        
+        switch(timeframe) {
+            case '1':
+            case '5':
+            case '60':
+                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            case 'D':
+                return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            case 'W':
+                return date.toLocaleDateString([], { month: 'short' });
+            case 'M':
+                return date.toLocaleDateString([], { year: 'numeric', month: 'short' });
+            default:
+                return date.toLocaleDateString();
         }
     }
     
@@ -169,50 +256,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Failed to load news:', error);
         }
-    }
-    
-    // Watchlist Functions
-    function updateWatchlist() {
-        const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-        const watchlistElement = document.getElementById('watchlist');
-        watchlistElement.innerHTML = '';
-        
-        watchlist.forEach(ticker => {
-            const item = document.createElement('div');
-            item.className = 'watchlist-item';
-            item.innerHTML = `
-                ${ticker}
-                <span class="remove-btn" data-ticker="${ticker}">×</span>
-            `;
-            item.addEventListener('click', (e) => {
-                if (e.target.classList.contains('remove-btn')) {
-                    removeFromWatchlist(ticker);
-                } else {
-                    tickerInput.value = ticker;
-                    fetchStockData();
-                }
-            });
-            watchlistElement.appendChild(item);
-        });
-    }
-    
-    function addCurrentToWatchlist() {
-        const ticker = tickerInput.value.trim().toUpperCase();
-        if (ticker && !recentTickers.includes(ticker)) {
-            const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-            if (!watchlist.includes(ticker)) {
-                watchlist.push(ticker);
-                localStorage.setItem('watchlist', JSON.stringify(watchlist));
-                updateWatchlist();
-            }
-        }
-    }
-    
-    function removeFromWatchlist(ticker) {
-        let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-        watchlist = watchlist.filter(t => t !== ticker);
-        localStorage.setItem('watchlist', JSON.stringify(watchlist));
-        updateWatchlist();
     }
     
     // Recent Tickers Management

@@ -17,7 +17,7 @@
                 <span class="terminal-btn yellow"></span>
                 <span class="terminal-btn green"></span>
             </div>
-            <div class="terminal-title">NEONSTOCK v2.4.1</div>
+            <div class="terminal-title">NEONSTOCK v3.0</div>
         </div>
         <div class="terminal-body">
             <div class="scanlines"></div>
@@ -60,10 +60,6 @@
                             <h2>CHANGE %</h2>
                             <p id="changePercent">-</p>
                         </div>
-                        <div class="info-card">
-                            <h2>MARKET CAP</h2>
-                            <p id="marketCap">-</p>
-                        </div>
                     </div>
                     
                     <div class="additional-data">
@@ -72,35 +68,17 @@
                             <p>PREV CLOSE: <span id="prevClose">-</span></p>
                             <p>OPEN: <span id="open">-</span></p>
                             <p>DAY RANGE: <span id="dayRange">-</span></p>
-                            <p>52WK RANGE: <span id="yearRange">-</span></p>
-                        </div>
-                        <div class="data-column">
-                            <h3>VOLUME DATA</h3>
-                            <p>VOLUME: <span id="volume">-</span></p>
-                            <p>AVG VOLUME: <span id="avgVolume">-</span></p>
                         </div>
                     </div>
                 </div>
-
-                <!-- Add these inside the terminal-body div, after the stockInfo div -->
+                
                 <div id="stockChartContainer" class="hidden">
-                    <h2>PRICE MOVEMENT</h2>
                     <canvas id="stockChart"></canvas>
                 </div>
-
+                
                 <div id="newsContainer" class="hidden">
                     <h2>LATEST NEWS</h2>
                     <div id="newsFeed"></div>
-                </div>
-
-                <div id="watchlistContainer" class="hidden">
-                    <h2>YOUR WATCHLIST</h2>
-                    <div id="watchlist"></div>
-                    <button id="addToWatchlist">+ ADD CURRENT STOCK</button>
-                </div>
-
-                <div class="theme-toggle">
-                    <button id="themeBtn">TOGGLE DARK/LIGHT MODE</button>
                 </div>
                 
                 <div class="recent-searches">
@@ -113,6 +91,10 @@
             <span class="blink">SYSTEM READY</span>
             <span id="datetime"></span>
         </div>
+    </div>
+    
+    <div class="theme-toggle">
+        <button id="themeBtn">TOGGLE DARK/LIGHT MODE</button>
     </div>
     
     <script src="script.js"></script>
